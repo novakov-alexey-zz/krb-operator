@@ -1,0 +1,45 @@
+# for creating these resources it requires the user to be logged in as system admin
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: krb-operator
+---
+#TODO: this binding to powerful need to describe only required actions
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: krb-operator-edit-resources
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: ""
+subjects:
+  - kind: ServiceAccount
+    name: krb-operator
+    namespace: default
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: krb-operator
+  labels: &default-labels
+    app.kubernetes.io/name: krb-operator
+    app.kubernetes.io/version: v0.0.1-v1alpha1
+spec:
+  replicas: 1
+  selector:
+    matchLabels: *default-labels
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels: *default-labels
+    spec:
+      serviceAccountName: krb-operator
+      containers:
+        - name: krb-operator
+          image: io.github.novakovalexey/krb-operator:latest
+          env:
+            - name: KRB5_IMAGE
+              value: docker-registry.default.svc:5000/yp-kss/krb5:latest
+          imagePullPolicy: IfNotPresent

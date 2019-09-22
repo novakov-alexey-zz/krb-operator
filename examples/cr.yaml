@@ -1,0 +1,18 @@
+apiVersion: io.github.novakov-alexey/v1
+kind: Krb
+metadata:
+  name: my-krb
+  namespace: yp-kss
+spec:
+  realm: EXAMPLE.COM
+  principals:
+    - name: client1
+      password: static
+      value: mypass
+    - name: user2
+      password: random
+  keytabs:
+    - secret: cluster-keytab-secret
+      key: cluster.keytab
+      principal: client1
+      realm: EXAMPLE.COM
