@@ -9,7 +9,8 @@ resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/
 lazy val root = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
-      "io.github.novakov-alexey" %% "k8s-operator4s-core" % "0.1.0-SNAPSHOT",
+      operatorLib,
+      codecs,
       osClient,
       scalaLogging,
       logbackClassic,

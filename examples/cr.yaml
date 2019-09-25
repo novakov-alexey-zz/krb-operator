@@ -9,10 +9,9 @@ spec:
     - name: client1
       password: static
       value: mypass
+      keytab: cluster.keytab
+      secret: cluster-keytab-secret
     - name: user2
       password: random
-  keytabs:
-    - secret: cluster-keytab-secret
-      key: cluster.keytab
-      principal: client1
-      realm: EXAMPLE.COM
+      keytab: cluster.keytab
+      secret: cluster-keytab-secret

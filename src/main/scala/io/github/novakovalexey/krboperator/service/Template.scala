@@ -1,9 +1,10 @@
-package io.github.novakovalexey.krboperator
+package io.github.novakovalexey.krboperator.service
 
 import java.io.File
 
 import io.fabric8.kubernetes.api.model.KubernetesList
 import io.fabric8.openshift.client.{OpenShiftClient, ParameterValue}
+import io.github.novakovalexey.krboperator.KrbOperatorCfg
 
 class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg) {
 

@@ -73,6 +73,13 @@ objects:
               image: ''
               imagePullPolicy: Always
               name: kadmin
+              readinessProbe:
+                exec:
+                  command:
+                    - ls
+                    - /etc/krb5.conf
+                initialDelaySeconds: 10
+                periodSeconds: 5
               ports:
                 - containerPort: 8888
                   protocol: TCP

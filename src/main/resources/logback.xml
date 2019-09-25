@@ -15,9 +15,6 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <logger name="slick" level="OFF"/>
-    <logger name="com.zaxxer.hikari" level="OFF"/>
-
     <root level="INFO">
         <appender-ref ref="ASYNCSTDOUT"/>
     </root>
