@@ -4,24 +4,26 @@ import java.nio.file.{Files, Path, Paths}
 import java.util.Base64
 
 import com.typesafe.scalalogging.LazyLogging
-import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
+import io.fabric8.kubernetes.api.model.SecretBuilder
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.k8soperator4s.common.Metadata
-import io.github.novakovalexey.krboperator.Principal
-import io.github.novakovalexey.krboperator.service.SecretService._
+import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-object SecretService {
-  val Prefix = "operator"
-}
-
-class SecretService(client: KubernetesClient) extends LazyLogging {
+class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg) extends LazyLogging {
 
   def getAdminPwd(meta: Metadata): Either[Throwable, String] = {
-    val secret = s"$Prefix-krb-admin-secret"
-    Try(Option(client.secrets().inNamespace(meta.namespace).withName(secret).get())).toEither match {
+    Try {
+      Option(
+        client
+          .secrets()
+          .inNamespace(meta.namespace)
+          .withName(operatorCfg.secretForAdminPwd)
+          .get()
+      )
+    }.toEither match {
       case Right(Some(s)) =>
         val pwd = Option(s.getData).flatMap(_.asScala.toMap.get("krb5_pass"))
         pwd match {
@@ -34,7 +36,7 @@ class SecretService(client: KubernetesClient) extends LazyLogging {
         }
 
       case Right(None) =>
-        Left(new RuntimeException(s"Failed to find a secret '$secret'"))
+        Left(new RuntimeException(s"Failed to find a secret '${operatorCfg.secretForAdminPwd}'"))
 
       case Left(e) => Left(e)
     }

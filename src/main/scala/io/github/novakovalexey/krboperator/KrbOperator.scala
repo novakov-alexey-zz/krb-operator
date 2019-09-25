@@ -67,7 +67,9 @@ class KrbOperator(
   private def waitForDeployment(metadata: Metadata): Either[Throwable, Unit] =
     Try {
       val deployment = getDeploymentConfig(metadata).get()
-      client.resource(deployment).waitUntilReady(60, TimeUnit.SECONDS)
+      val duration = (1, TimeUnit.MINUTES)
+      logger.info(s"Going to wait for deployment until ready: $duration")
+      client.resource(deployment).waitUntilReady(duration._1, duration._2)
     }.toEither.map { _ =>
       logger.info(s"deployment is ready: $metadata")
       ()
@@ -75,6 +77,7 @@ class KrbOperator(
 
   private def exists(meta: Metadata): Future[Boolean] = Future {
     Try {
+      //TODO: check whether service, secret and image stream exist, if something is missing let's recreate everything from scratch
       Option(getDeploymentConfig(meta).get())
     } match {
       case Success(Some(_)) => true
@@ -95,7 +98,7 @@ class KrbOperator(
         .resourceList(resources)
         .inNamespace(meta.namespace)
         .createOrReplaceAnd()
-        .waitUntilReady(60, TimeUnit.SECONDS)
+        .waitUntilReady(1, TimeUnit.MINUTES)
 
       logger.info(s"template submitted for: $krb")
       ()

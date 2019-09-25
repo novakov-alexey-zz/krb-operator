@@ -2,14 +2,20 @@ package io.github.novakovalexey.krboperator
 
 import java.io.File
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions}
+import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.typesafe.scalalogging.StrictLogging
 import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.ProductHint
-import pureconfig.{CamelCase, ConfigFieldMapping, loadConfig}
 import pureconfig.generic.auto._
+import pureconfig.{loadConfig, CamelCase, ConfigFieldMapping}
 
-final case class KrbOperatorCfg(image: String, templatePath: String)
+final case class KrbOperatorCfg(
+  image: String,
+  templatePath: String,
+  kadminContainer: String,
+  k8sResourcesPrefix: String,
+  secretForAdminPwd: String
+)
 
 object AppConfig extends StrictLogging {
   private val parseOptions = ConfigParseOptions.defaults().setAllowMissing(false)

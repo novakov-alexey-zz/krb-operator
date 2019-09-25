@@ -20,6 +20,10 @@ parameters:
     displayName: Kerberos Realm
     value: EXAMPLE.COM
     required: true
+  - name: ADMIN_PWD
+    description: Kerberos admin password
+    generate: expression
+    from: '[\w]{10}'
 objects:
   - apiVersion: v1
     kind: ImageStream
@@ -136,7 +140,7 @@ objects:
               name: krb5-config
             - name: admin-secret
               secret:
-                secretName: ${PREFIX}-krb-admin-secret
+                secretName: ${PREFIX}-krb-admin-pwd
       test: false
       triggers:
         - type: ConfigChange
@@ -182,8 +186,9 @@ objects:
   - apiVersion: v1
     kind: Secret
     metadata:
-      name: ${PREFIX}-krb-admin-secret
+      name: ${PREFIX}-krb-admin-pwd
       annotations:
-        template.openshift.io/base64-expose-password: "{.data['krb5_pass']}"
+        template.openshift.io/expose-krb5_pass: "{.data['krb5_pass']}"
+    type: Opaque
     stringData:
-      krb5_pass: "1234567"
+      krb5_pass: ${ADMIN_PWD}
