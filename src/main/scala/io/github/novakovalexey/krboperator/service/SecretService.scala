@@ -9,13 +9,15 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.k8soperator4s.common.Metadata
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg) extends LazyLogging {
+class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(implicit ec: ExecutionContext)
+    extends LazyLogging {
 
-  def getAdminPwd(meta: Metadata): Either[Throwable, String] = {
-    Try {
+  def getAdminPwd(meta: Metadata): Future[String] = {
+    val f = Future {
       Option(
         client
           .secrets()
@@ -23,38 +25,34 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg) exten
           .withName(operatorCfg.secretForAdminPwd)
           .get()
       )
-    }.toEither match {
-      case Right(Some(s)) =>
+    }.flatMap {
+      case Some(s) =>
         val pwd = Option(s.getData).flatMap(_.asScala.toMap.get("krb5_pass"))
         pwd match {
           case Some(p) =>
             logger.info(s"Found admin password for $meta")
             val decoded = Base64.getDecoder.decode(p)
-            Right[Throwable, String](new String(decoded))
+            Future.successful(new String(decoded))
           case None =>
-            Left(new RuntimeException("Failed to get admin password"))
+            Future.failed(new RuntimeException("Failed to get admin password"))
         }
-
-      case Right(None) =>
-        Left(new RuntimeException(s"Failed to find a secret '${operatorCfg.secretForAdminPwd}'"))
-
-      case Left(e) => Left(e)
+      case None =>
+        Future.failed(new RuntimeException(s"Failed to find a secret '${operatorCfg.secretForAdminPwd}'"))
     }
+    f.failed.foreach(t => logger.error("Failed to get admin password", t))
+    f
   }
 
-  def createSecrets(
-    namespace: String,
-    principals: List[Principal],
-    keytabToPath: String => String
-  ): Either[Throwable, Int] = {
-    val secretToKeytabs = principals.groupBy(_.secret).view.mapValues(_.map(_.keytab).toSet).toMap
+  def createSecrets(namespace: String, principals: List[Principal], keytabToPath: String => String): Future[Int] =
+    Future {
+      val secretToKeytabs = principals.groupBy(_.secret).view.mapValues(_.map(_.keytab).toSet).toMap
 
-    secretToKeytabs.foldLeft(Right(0): Either[Throwable, Int]) {
-      case (acc, (secret, keytabs)) =>
-        replaceOrCreateSecret(namespace, secret, keytabs.map(p => (p, Paths.get(keytabToPath(p)))))
-          .flatMap(_ => acc.map(_ + 1))
-    }
-  }
+      secretToKeytabs.foldLeft(Right(0): Either[Throwable, Int]) {
+        case (acc, (secret, keytabs)) =>
+          replaceOrCreateSecret(namespace, secret, keytabs.map(p => (p, Paths.get(keytabToPath(p)))))
+            .flatMap(_ => acc.map(_ + 1))
+      }
+    }.flatMap(r => Future.fromTry(r.toTry))
 
   private def replaceOrCreateSecret(
     namespace: String,
@@ -77,7 +75,7 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg) exten
         }
         .build()
       client.secrets().inNamespace(namespace).createOrReplace(secret)
-      logger.info(s"Secret $secret has been created")
+      logger.info(s"Secret $secretName has been created in $namespace")
     }.toEither
   }
 }
