@@ -191,4 +191,4 @@ objects:
         template.openshift.io/expose-krb5_pass: "{.data['admin_pwd']}"
     type: Opaque
     stringData:
-      krb5_pass: ${ADMIN_PWD}
+      admin_pwd: ${ADMIN_PWD}

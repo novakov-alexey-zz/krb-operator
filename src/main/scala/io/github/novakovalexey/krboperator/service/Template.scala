@@ -13,7 +13,7 @@ class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg) {
   private val template = new File(operatorCfg.templatePath)
 
   private def params(kdcName: String, realm: String) = Map(
-    "KRB5_IMAGE" -> operatorCfg.image,
+    "KRB5_IMAGE" -> operatorCfg.krb5Image,
     "PREFIX" -> operatorCfg.k8sResourcesPrefix,
     "KDC_SERVER" -> kdcName,
     "KRB5_REALM" -> realm

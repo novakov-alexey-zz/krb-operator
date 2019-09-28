@@ -10,7 +10,7 @@ import pureconfig.generic.auto._
 import pureconfig.{loadConfig, CamelCase, ConfigFieldMapping}
 
 final case class KrbOperatorCfg(
-  image: String,
+  krb5Image: String,
   templatePath: String,
   adminPrincipal: String,
   addPrincipalCmd: String,

@@ -26,7 +26,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       logger.info(s"listener closed with code '$code', reason: $reason")
   }
 
-  def initKerberos(meta: Metadata, krb: Krb, adminPwd: String): Future[String] =
+  def initKerberos(meta: Metadata, krb: Krb, adminPwd: String): Future[(String, List[String])] =
     Future {
       client
         .pods()
@@ -43,16 +43,16 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
           //TODO: wait is blocking operation, need to write own wait function
           client.resource(p).inNamespace(meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
           logger.debug(s"POD '${p.getMetadata.getName}' is ready")
-          addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
+          val keytabPaths = addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
           logger.info("keytabs added")
-          p.getMetadata.getName
+          (p.getMetadata.getName, keytabPaths)
         }
       case None =>
         logger.error(s"Failed to init Kerberos for $meta")
         Future.failed(new RuntimeException("No KDC POD found"))
     }
 
-  private def addKeytabs(meta: Metadata, krb: Krb, adminPwd: String, podName: String): Unit = {
+  private def addKeytabs(meta: Metadata, krb: Krb, adminPwd: String, podName: String) = {
     val exe = client
       .pods()
       .inNamespace(meta.namespace)
@@ -68,17 +68,17 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       createPrincipal(krb, adminPwd, exe, p)
       createKeytab(krb, adminPwd, exe, p)
     }
-    ()
   }
 
   private def createKeytab(krb: Krb, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {
-    val path = keytabToPath(p.keytab)
+    val keytabPath = keytabToPath(p.keytab)
     val keytabCmd = cfg.addKeytabCmd
       .replaceAll("\\$realm", krb.realm)
-      .replaceAll("\\$path", path)
+      .replaceAll("\\$path", keytabPath)
       .replaceAll("\\$username", p.name)
     val addKeytab = s"echo '$adminPwd' | $keytabCmd"
     exe.exec("bash", "-c", addKeytab)
+    keytabPath
   }
 
   private def createPrincipal(krb: Krb, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {

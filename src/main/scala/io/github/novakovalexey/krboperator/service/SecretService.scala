@@ -45,7 +45,11 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
 
   def createSecrets(namespace: String, principals: List[Principal], keytabToPath: String => String): Future[Int] =
     Future {
-      val secretToKeytabs = principals.groupBy(_.secret).view.mapValues(_.map(_.keytab).toSet).toMap
+      val secretToKeytabs = principals
+        .groupBy(_.secret)
+        .view
+        .mapValues(_.map(_.keytab).toSet)
+        .toMap
 
       secretToKeytabs.foldLeft(Right(0): Either[Throwable, Int]) {
         case (acc, (secret, keytabs)) =>

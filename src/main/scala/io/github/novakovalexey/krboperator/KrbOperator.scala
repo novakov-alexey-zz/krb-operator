@@ -34,8 +34,8 @@ class KrbOperator(
           _ <- createOrReplace(krb, meta)
           _ <- waitForDeployment(meta)
           pwd <- secret.getAdminPwd(meta)
-          pod <- kadmin.initKerberos(meta, krb, pwd)
-          _ <- copyKeytabs(meta.namespace, krb.principals, pod)
+          (pod, keytabPaths) <- kadmin.initKerberos(meta, krb, pwd)
+          _ <- copyKeytabs(meta.namespace, keytabPaths, pod)
           n <- secret.createSecrets(meta.namespace, krb.principals, Kadmin.keytabToPath)
           _ = logger.info(s"$n secret(s) were created in ${meta.namespace}")
         } yield ()
@@ -50,15 +50,14 @@ class KrbOperator(
     }
   }
 
-  private def copyKeytabs(namespace: String, principals: List[Principal], pod: String): Future[Unit] =
-    Future(principals.foreach { p =>
-      val path = Kadmin.keytabToPath(p.keytab)
+  private def copyKeytabs(namespace: String, keytabPaths: List[String], pod: String): Future[Unit] =
+    Future(keytabPaths.foreach { kp =>
       client.pods
         .inNamespace(namespace)
         .withName(pod)
         .inContainer(operatorCfg.kadminContainer)
-        .file(path)
-        .copy(Paths.get(path))
+        .file(kp)
+        .copy(Paths.get(kp))
     })
 
   private def waitForDeployment(metadata: Metadata): Future[Unit] = {
@@ -119,7 +118,7 @@ class KrbOperator(
     val t = Future {
       val resources = template.resources(meta.name, krb.realm)
       lazy val count = Option(resources.getItems).map(_.size()).getOrElse(0)
-      logger.debug(s"number of resources to delete: $count")
+      logger.info(s"number of resources to delete: $count")
 
       val deleted = client
         .resourceList(resources)
