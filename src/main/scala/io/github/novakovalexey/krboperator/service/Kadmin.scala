@@ -14,6 +14,16 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
+
+final case class KerberosState(podName: String, principals: List[(Principal, KeytabPath)])
+
+object Kadmin {
+  type KeytabPath = String
+
+  def keytabToPath(k: String): String =
+    s"/tmp/$k"
+}
+
 class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
   private val listener = new ExecListener {
     override def onOpen(response: Response): Unit =
@@ -26,7 +36,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       logger.info(s"listener closed with code '$code', reason: $reason")
   }
 
-  def initKerberos(meta: Metadata, krb: Krb, adminPwd: String): Future[(String, List[String])] =
+  def initKerberos(meta: Metadata, krb: Krb, adminPwd: String): Future[KerberosState] =
     Future {
       client
         .pods()
@@ -45,7 +55,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
           logger.debug(s"POD '${p.getMetadata.getName}' is ready")
           val keytabPaths = addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
           logger.info("keytabs added")
-          (p.getMetadata.getName, keytabPaths)
+          KerberosState(p.getMetadata.getName, keytabPaths)
         }
       case None =>
         logger.error(s"Failed to init Kerberos for $meta")
@@ -66,7 +76,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
 
     krb.principals.map { p =>
       createPrincipal(krb, adminPwd, exe, p)
-      createKeytab(krb, adminPwd, exe, p)
+      p -> createKeytab(krb, adminPwd, exe, p)
     }
   }
 
@@ -77,6 +87,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       .replaceAll("\\$path", keytabPath)
       .replaceAll("\\$username", p.name)
     val addKeytab = s"echo '$adminPwd' | $keytabCmd"
+    logger.debug("addKeytab: " + addKeytab)
     exe.exec("bash", "-c", addKeytab)
     keytabPath
   }
@@ -85,16 +96,11 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
     val addCmd = cfg.addPrincipalCmd
       .replaceAll("\\$realm", krb.realm)
       .replaceAll("\\$username", p.name)
-      .replaceAll("\\$password", if (p.password == "random") randomString else p.value)
+      .replaceAll("\\$password", if (p.isRandomPassword) randomString else p.value)
     val addPrincipal = s"echo '$adminPwd' | $addCmd"
     exe.exec("bash", "-c", addPrincipal)
   }
 
   private def randomString =
     Random.alphanumeric.take(10).mkString
-}
-
-object Kadmin {
-  def keytabToPath(k: String): String =
-    s"/tmp/$k"
 }

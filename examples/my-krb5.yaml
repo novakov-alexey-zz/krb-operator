@@ -12,6 +12,5 @@ spec:
       keytab: cluster.keytab
       secret: cluster-keytab-secret
     - name: user2
-      password: random
       keytab: cluster.keytab
       secret: cluster-keytab-secret

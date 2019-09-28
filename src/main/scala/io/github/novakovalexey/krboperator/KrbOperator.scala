@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.k8soperator4s.CrdOperator
 import io.github.novakovalexey.k8soperator4s.common.{CrdConfig, Metadata}
-import io.github.novakovalexey.krboperator.service.{Kadmin, SecretService, Template}
+import io.github.novakovalexey.krboperator.service.{Kadmin, KerberosState, SecretService, Template}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -34,9 +34,9 @@ class KrbOperator(
           _ <- createOrReplace(krb, meta)
           _ <- waitForDeployment(meta)
           pwd <- secret.getAdminPwd(meta)
-          (pod, keytabPaths) <- kadmin.initKerberos(meta, krb, pwd)
-          _ <- copyKeytabs(meta.namespace, keytabPaths, pod)
-          n <- secret.createSecrets(meta.namespace, krb.principals, Kadmin.keytabToPath)
+          state <- kadmin.initKerberos(meta, krb, pwd)
+          _ <- copyKeytabs(meta.namespace, state)
+          n <- secret.createSecrets(meta.namespace, state.principals)
           _ = logger.info(s"$n secret(s) were created in ${meta.namespace}")
         } yield ()
 
@@ -50,14 +50,15 @@ class KrbOperator(
     }
   }
 
-  private def copyKeytabs(namespace: String, keytabPaths: List[String], pod: String): Future[Unit] =
-    Future(keytabPaths.foreach { kp =>
-      client.pods
-        .inNamespace(namespace)
-        .withName(pod)
-        .inContainer(operatorCfg.kadminContainer)
-        .file(kp)
-        .copy(Paths.get(kp))
+  private def copyKeytabs(namespace: String, state: KerberosState): Future[Unit] =
+    Future(state.principals.foreach {
+      case (_, kp) =>
+        client.pods
+          .inNamespace(namespace)
+          .withName(state.podName)
+          .inContainer(operatorCfg.kadminContainer)
+          .file(kp)
+          .copy(Paths.get(kp))
     })
 
   private def waitForDeployment(metadata: Metadata): Future[Unit] = {
@@ -120,12 +121,14 @@ class KrbOperator(
       lazy val count = Option(resources.getItems).map(_.size()).getOrElse(0)
       logger.info(s"number of resources to delete: $count")
 
-      val deleted = client
+      val deleteByTemplate = client
         .resourceList(resources)
         .inNamespace(meta.namespace)
         .delete()
 
-      logger.info(s"Found resources to delete? $deleted")
+      val deleteDeployment = findDeploymentConfig(meta).delete()
+
+      logger.info(s"Found resources to delete? ${deleteByTemplate || deleteDeployment}")
       ()
     }
 

@@ -7,6 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model.SecretBuilder
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.k8soperator4s.common.Metadata
+import io.github.novakovalexey.krboperator.service.Kadmin.KeytabPath
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -43,17 +44,18 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
     f
   }
 
-  def createSecrets(namespace: String, principals: List[Principal], keytabToPath: String => String): Future[Int] =
+  def createSecrets(namespace: String, principals: List[(Principal, KeytabPath)]): Future[Int] =
     Future {
       val secretToKeytabs = principals
-        .groupBy(_.secret)
+        .groupBy(_._1.secret)
         .view
-        .mapValues(_.map(_.keytab).toSet)
+        .mapValues(_.map { case (p, kp) => (p.keytab, kp) }.toSet)
         .toMap
 
       secretToKeytabs.foldLeft(Right(0): Either[Throwable, Int]) {
         case (acc, (secret, keytabs)) =>
-          replaceOrCreateSecret(namespace, secret, keytabs.map(p => (p, Paths.get(keytabToPath(p)))))
+          val keytabPaths = keytabs.map(kt => (kt._1, Paths.get(kt._2)))
+          replaceOrCreateSecret(namespace, secret, keytabPaths)
             .flatMap(_ => acc.map(_ + 1))
       }
     }.flatMap(r => Future.fromTry(r.toTry))
@@ -64,6 +66,7 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
     keytabs: Set[(String, Path)],
   ): Either[Throwable, Unit] = {
     Try {
+      logger.debug(s"Creating secret for $keytabs keytabs")
       val builder = new SecretBuilder()
         .withNewMetadata()
         .withName(secretName)
