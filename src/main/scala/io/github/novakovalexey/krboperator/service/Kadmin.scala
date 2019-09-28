@@ -4,22 +4,23 @@ import java.util.concurrent.TimeUnit
 
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.fabric8.kubernetes.client.dsl.ExecListener
+import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
 import io.github.novakovalexey.k8soperator4s.common.Metadata
-import io.github.novakovalexey.krboperator.Krb
 import io.github.novakovalexey.krboperator.service.Kadmin._
+import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg, Principal}
 import okhttp3.Response
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
+import scala.util.Random
 
-class Kadmin(client: KubernetesClient)(implicit ec: ExecutionContext) extends LazyLogging {
+class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
   private val listener = new ExecListener {
     override def onOpen(response: Response): Unit =
       logger.info(s"on open: ${response.body().string()}")
 
     override def onFailure(t: Throwable, response: Response): Unit =
-      logger.error(s"Failure on pod exec: ${response.body().string()}", t)
+      logger.error(s"Failure on 'pod exec': ${response.body().string()}", t)
 
     override def onClose(code: Int, reason: String): Unit =
       logger.info(s"listener closed with code '$code', reason: $reason")
@@ -38,7 +39,9 @@ class Kadmin(client: KubernetesClient)(implicit ec: ExecutionContext) extends La
     }.flatMap {
       case Some(p) =>
         Future {
-          client.resource(p).inNamespace(meta.namespace).waitUntilReady(60, TimeUnit.SECONDS)
+          logger.debug(s"Waiting for POD in ${meta.namespace} namespace to be ready")
+          //TODO: wait is blocking operation, need to write own wait function
+          client.resource(p).inNamespace(meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
           logger.debug(s"POD '${p.getMetadata.getName}' is ready")
           addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
           logger.info("keytabs added")
@@ -54,7 +57,7 @@ class Kadmin(client: KubernetesClient)(implicit ec: ExecutionContext) extends La
       .pods()
       .inNamespace(meta.namespace)
       .withName(podName)
-      .inContainer("kadmin")
+      .inContainer(cfg.kadminContainer)
       .readingInput(System.in)
       .writingOutput(System.out)
       .writingError(System.err)
@@ -62,24 +65,36 @@ class Kadmin(client: KubernetesClient)(implicit ec: ExecutionContext) extends La
       .usingListener(listener)
 
     krb.principals.map { p =>
-      val addPrincipal = s"""echo '$adminPwd' | ${addprinc(krb.realm, p.name, p.value)}"""
-      exe.exec("bash", "-c", addPrincipal)
-
-      val path = keytabToPath(p.keytab)
-      val addKeytab = s"""echo '$adminPwd' | ${ktadd(krb.realm, p.name, path)}"""
-      exe.exec("bash", "-c", addKeytab)
+      createPrincipal(krb, adminPwd, exe, p)
+      createKeytab(krb, adminPwd, exe, p)
     }
     ()
   }
+
+  private def createKeytab(krb: Krb, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {
+    val path = keytabToPath(p.keytab)
+    val keytabCmd = cfg.addKeytabCmd
+      .replaceAll("\\$realm", krb.realm)
+      .replaceAll("\\$path", path)
+      .replaceAll("\\$username", p.name)
+    val addKeytab = s"echo '$adminPwd' | $keytabCmd"
+    exe.exec("bash", "-c", addKeytab)
+  }
+
+  private def createPrincipal(krb: Krb, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {
+    val addCmd = cfg.addPrincipalCmd
+      .replaceAll("\\$realm", krb.realm)
+      .replaceAll("\\$username", p.name)
+      .replaceAll("\\$password", if (p.password == "random") randomString else p.value)
+    val addPrincipal = s"echo '$adminPwd' | $addCmd"
+    exe.exec("bash", "-c", addPrincipal)
+  }
+
+  private def randomString =
+    Random.alphanumeric.take(10).mkString
 }
 
 object Kadmin {
   def keytabToPath(k: String): String =
     s"/tmp/$k"
-
-  def addprinc(realm: String, username: String, password: String): String =
-    s"""kadmin -r $realm -p admin/admin@$realm -q \"addprinc -pw $password -clearpolicy -requires_preauth $username@$realm\""""
-
-  def ktadd(realm: String, username: String, path: String): String =
-    s"""kadmin -r $realm -p admin/admin@$realm -q \"ktadd -kt $path $username@$realm\""""
 }

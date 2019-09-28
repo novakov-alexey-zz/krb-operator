@@ -12,9 +12,13 @@ import pureconfig.{loadConfig, CamelCase, ConfigFieldMapping}
 final case class KrbOperatorCfg(
   image: String,
   templatePath: String,
+  adminPrincipal: String,
+  addPrincipalCmd: String,
+  addKeytabCmd: String,
   kadminContainer: String,
   k8sResourcesPrefix: String,
-  secretForAdminPwd: String
+  secretForAdminPwd: String,
+  secretKeyForAdminPwd: String
 )
 
 object AppConfig extends StrictLogging {

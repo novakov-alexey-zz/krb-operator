@@ -188,7 +188,7 @@ objects:
     metadata:
       name: ${PREFIX}-krb-admin-pwd
       annotations:
-        template.openshift.io/expose-krb5_pass: "{.data['krb5_pass']}"
+        template.openshift.io/expose-krb5_pass: "{.data['admin_pwd']}"
     type: Opaque
     stringData:
       krb5_pass: ${ADMIN_PWD}

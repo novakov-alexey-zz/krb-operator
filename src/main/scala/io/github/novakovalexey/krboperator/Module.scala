@@ -21,7 +21,7 @@ class Module {
   )
 
   val template = new Template(client, operatorCfg)
-  val kadmin = new Kadmin(client)
+  val kadmin = new Kadmin(client, operatorCfg)
   val secret = new SecretService(client, operatorCfg)
   val cfg = CrdConfig(classOf[Krb], AllNamespaces, "io.github.novakov-alexey")
   val operator = new KrbOperator(client, cfg, operatorCfg, template, kadmin, secret)

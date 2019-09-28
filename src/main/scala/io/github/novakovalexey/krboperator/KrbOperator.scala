@@ -33,8 +33,8 @@ class KrbOperator(
           _ <- deleteWithTemplate(krb, meta)
           _ <- createOrReplace(krb, meta)
           _ <- waitForDeployment(meta)
-          p <- secret.getAdminPwd(meta)
-          pod <- kadmin.initKerberos(meta, krb, p)
+          pwd <- secret.getAdminPwd(meta)
+          pod <- kadmin.initKerberos(meta, krb, pwd)
           _ <- copyKeytabs(meta.namespace, krb.principals, pod)
           n <- secret.createSecrets(meta.namespace, krb.principals, Kadmin.keytabToPath)
           _ = logger.info(s"$n secret(s) were created in ${meta.namespace}")
@@ -83,7 +83,7 @@ class KrbOperator(
     } match {
       case Success(b) => b
       case Failure(e) =>
-        logger.error("Failed to get current deployment config, so assuming it does not exists", e)
+        logger.error("Failed to get current deployment config, so assuming it does not exist", e)
         false
     }
   }
@@ -119,7 +119,7 @@ class KrbOperator(
     val t = Future {
       val resources = template.resources(meta.name, krb.realm)
       lazy val count = Option(resources.getItems).map(_.size()).getOrElse(0)
-      logger.debug(s"resources count to delete $count")
+      logger.debug(s"number of resources to delete: $count")
 
       val deleted = client
         .resourceList(resources)

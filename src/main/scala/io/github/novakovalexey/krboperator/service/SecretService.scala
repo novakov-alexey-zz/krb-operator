@@ -27,7 +27,7 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
       )
     }.flatMap {
       case Some(s) =>
-        val pwd = Option(s.getData).flatMap(_.asScala.toMap.get("krb5_pass"))
+        val pwd = Option(s.getData).flatMap(_.asScala.toMap.get(operatorCfg.secretKeyForAdminPwd))
         pwd match {
           case Some(p) =>
             logger.info(s"Found admin password for $meta")
