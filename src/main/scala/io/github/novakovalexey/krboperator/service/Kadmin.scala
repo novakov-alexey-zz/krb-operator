@@ -87,7 +87,6 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       .replaceAll("\\$path", keytabPath)
       .replaceAll("\\$username", p.name)
     val addKeytab = s"echo '$adminPwd' | $keytabCmd"
-    logger.debug("addKeytab: " + addKeytab)
     exe.exec("bash", "-c", addKeytab)
     keytabPath
   }
