@@ -1,5 +1,6 @@
 package io.github.novakovalexey.krboperator.service
 
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 import com.typesafe.scalalogging.LazyLogging
@@ -13,7 +14,6 @@ import okhttp3.Response
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
-
 
 final case class KerberosState(podName: String, principals: List[(Principal, KeytabPath)])
 
@@ -53,16 +53,26 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
           //TODO: wait is blocking operation, need to write own wait function
           client.resource(p).inNamespace(meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
           logger.debug(s"POD '${p.getMetadata.getName}' is ready")
-          val keytabPaths = addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
-          logger.info("keytabs added")
-          KerberosState(p.getMetadata.getName, keytabPaths)
+          addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
+        }.flatMap {
+          case Right(paths) =>
+            logger.info("keytabs added")
+            Future.successful(KerberosState(p.getMetadata.getName, paths))
+          case Left(e) =>
+            Future.failed(new RuntimeException(s"Failed to create keytab(s) via kadmin: $e"))
         }
       case None =>
         logger.error(s"Failed to init Kerberos for $meta")
         Future.failed(new RuntimeException("No KDC POD found"))
     }
 
-  private def addKeytabs(meta: Metadata, krb: Krb, adminPwd: String, podName: String) = {
+  private def addKeytabs(
+    meta: Metadata,
+    krb: Krb,
+    adminPwd: String,
+    podName: String
+  ): Either[String, List[(Principal, String)]] = {
+    val errStream = new ByteArrayOutputStream()
     val exe = client
       .pods()
       .inNamespace(meta.namespace)
@@ -70,13 +80,21 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       .inContainer(cfg.kadminContainer)
       .readingInput(System.in)
       .writingOutput(System.out)
-      .writingError(System.err)
+      .writingError(errStream)
       .withTTY()
       .usingListener(listener)
 
-    krb.principals.map { p =>
-      createPrincipal(krb, adminPwd, exe, p)
-      p -> createKeytab(krb, adminPwd, exe, p)
+    val errors = new String(errStream.toByteArray)
+
+    if (errors.nonEmpty) {
+      logger.error(s"Error occurred: $errors")
+      Left(errors)
+    } else {
+      val paths = krb.principals.map { p =>
+        createPrincipal(krb, adminPwd, exe, p)
+        p -> createKeytab(krb, adminPwd, exe, p)
+      }
+      Right(paths)
     }
   }
 
@@ -95,10 +113,13 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
     val addCmd = cfg.addPrincipalCmd
       .replaceAll("\\$realm", krb.realm)
       .replaceAll("\\$username", p.name)
-      .replaceAll("\\$password", if (p.isRandomPassword) randomString else p.value)
+      .replaceAll("\\$password", if (isRandomPassword(p.password)) randomString else p.value)
     val addPrincipal = s"echo '$adminPwd' | $addCmd"
     exe.exec("bash", "-c", addPrincipal)
   }
+
+  private def isRandomPassword(password: String): Boolean =
+    password == null || password == "random"
 
   private def randomString =
     Random.alphanumeric.take(10).mkString
