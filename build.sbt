@@ -1,3 +1,5 @@
+import NativePackagerHelper._
+
 name := "krb-operator"
 version := "0.1"
 scalaVersion := "2.13.1"
@@ -16,6 +18,8 @@ lazy val root = (project in file("."))
       logbackClassic,
       pureConfig
     ),
-    dockerBaseImage := "centos:centos7",
+    dockerBaseImage := "openjdk:8-jre-alpine",
   )
-  .enablePlugins(JavaAppPackaging)
+  .enablePlugins(AshScriptPlugin)
+
+mappings in Universal ++= directory("src/main/resources")

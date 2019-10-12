@@ -45,7 +45,7 @@ class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg)(implicit ec
     }
 
   def delete(krb: Krb, meta: Metadata): Future[Unit] = {
-    val t = Future {
+    val f = Future {
       val resources = resourceList(meta.name, krb.realm)
       lazy val count = Option(resources.getItems).map(_.size()).getOrElse(0)
       logger.info(s"number of resources to delete: $count")
@@ -65,8 +65,8 @@ class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg)(implicit ec
       ()
     }
 
-    t.failed.foreach(e => logger.error("Failed to delete", e))
-    t
+    f.failed.foreach(e => logger.error("Failed to delete", e))
+    f
   }
 
   def waitForDeployment(metadata: Metadata): Future[Unit] = {
@@ -77,8 +77,7 @@ class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg)(implicit ec
       client.resource(deployment).waitUntilReady(duration._1, duration._2)
       logger.info(s"deployment is ready: $metadata")
     }
-    f.failed.foreach(e => new RuntimeException(s"Failed to wait for deployment: $metadata", e))
-    f
+    f.failed.map(e => new RuntimeException(s"Failed to wait for deployment: $metadata", e))
   }
 
   def isIncomplete(meta: Metadata): Future[Boolean] = Future {
