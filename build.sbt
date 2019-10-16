@@ -16,7 +16,8 @@ lazy val root = (project in file("."))
       osClient,
       scalaLogging,
       logbackClassic,
-      pureConfig
+      pureConfig,
+      cats
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
   )

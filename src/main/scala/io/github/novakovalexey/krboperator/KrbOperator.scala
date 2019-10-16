@@ -6,7 +6,8 @@ import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.k8soperator4s.CrdOperator
 import io.github.novakovalexey.k8soperator4s.common.{CrdConfig, Metadata}
-import io.github.novakovalexey.krboperator.service.{Kadmin, KerberosState, SecretService, Template}
+import io.github.novakovalexey.krboperator.service.Kadmin.KeytabPath
+import io.github.novakovalexey.krboperator.service._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -24,39 +25,65 @@ class KrbOperator(
   override def onAdd(krb: Krb, meta: Metadata): Unit = {
     logger.info(s"add event: $krb, $meta")
 
-    template.isIncomplete(meta).flatMap { yes =>
-      if (yes) {
-        logger.info("Creating everything from scratch")
-        val r = for {
-          _ <- template.delete(krb, meta)
-          _ <- template.createOrReplace(krb, meta)
-          _ <- template.waitForDeployment(meta)
-          pwd <- secret.getAdminPwd(meta)
-          state <- kadmin.initKerberos(meta, krb, pwd)
-          _ <- copyKeytabs(meta.namespace, state)
-          n <- secret.createSecrets(meta.namespace, state.principals)
-          _ = logger.info(s"$n secret(s) were created in ${meta.namespace}")
-          _ = logger.info(s"new instance $meta has been created")
-        } yield ()
-
-        r.failed.foreach(t => logger.error("Failed to create", t))
-        r
-      } else {
-        logger.info(s"Krb instance $meta already exists, so ignoring this event")
-        Future.successful(())
+    for {
+      _ <- template.findDeploymentConfig(meta) match {
+        case Some(_) =>
+          logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
+          Future.successful(())
+        case None =>
+          template.createDeploymentConfig(meta).flatMap(_ => template.waitForDeployment(meta))
       }
-    }
+
+      _ <- template.findService(meta) match {
+        case Some(_) =>
+          logger.info(s"[${meta.name}] Service is found, so skipping its creation")
+          Future.successful(())
+        case None => template.createService(meta)
+      }
+
+      _ <- template.findAdminSecret(meta) match {
+        case Some(_) =>
+          logger.info(s"[${meta.name}] Admin Secret is found, so skipping its creation")
+          Future.successful(())
+        case None =>
+          template.createAdminSecret(meta)
+      }
+
+      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret).toSet)
+      _ <- {
+        logger.info(s"There are ${missingSecrets.size} missing secrets")
+
+        lazy val adminPwd = secret.getAdminPwd(meta)
+        val r = missingSecrets.map(s => (s, krb.principals.filter(_.secret == s))).map {
+          case (secretName, ps) =>
+            for {
+              pwd <- adminPwd
+              state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd, secretName))
+              statuses <- copyKeytabs(meta.namespace, state)
+              _ <- if (statuses.forall(_._2 == true))
+                Future.successful(())
+              else
+                Future.failed(
+                  new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
+                )
+              _ <- secret.createSecret(meta.namespace, state.keytabPaths, secretName)
+            } yield ()
+        }
+        Future.sequence(r)
+      }
+    } yield ()
   }
 
-  private def copyKeytabs(namespace: String, state: KerberosState): Future[Unit] =
-    Future(state.principals.foreach {
-      case (_, kp) =>
-        client.pods
+  private def copyKeytabs(namespace: String, state: KerberosState): Future[List[(KeytabPath, Boolean)]] =
+    Future(state.keytabPaths.foldLeft(List.empty[(KeytabPath, Boolean)]) {
+      case (acc, keytab) =>
+        logger.debug(s"Copying keytab '$keytab' into $namespace:${state.podName} POD")
+        acc :+ (keytab.path, client.pods
           .inNamespace(namespace)
           .withName(state.podName)
           .inContainer(operatorCfg.kadminContainer)
-          .file(kp)
-          .copy(Paths.get(kp))
+          .file(keytab.path)
+          .copy(Paths.get(keytab.path)))
     })
 
   override def onDelete(krb: Krb, meta: Metadata): Unit = {

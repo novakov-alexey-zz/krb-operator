@@ -1,14 +1,14 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
 import java.util.Base64
 
+import cats.syntax.option._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model.SecretBuilder
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.k8soperator4s.common.Metadata
-import io.github.novakovalexey.krboperator.service.Kadmin.KeytabPath
-import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
+import io.github.novakovalexey.krboperator.KrbOperatorCfg
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
@@ -44,45 +44,33 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
     f
   }
 
-  def createSecrets(namespace: String, principals: List[(Principal, KeytabPath)]): Future[Int] =
-    Future {
-      val secretToKeytabs = principals
-        .groupBy(_._1.secret)
-        .view
-        .mapValues(_.map { case (p, kp) => (p.keytab, kp) }.toSet)
-        .toMap
-
-      secretToKeytabs.foldLeft(Right(0): Either[Throwable, Int]) {
-        case (acc, (secret, keytabs)) =>
-          val keytabPaths = keytabs.map(kt => (kt._1, Paths.get(kt._2)))
-          replaceOrCreateSecret(namespace, secret, keytabPaths)
-            .flatMap(_ => acc.map(_ + 1))
-      }
-    }.flatMap(r => Future.fromTry(r.toTry))
-
-  private def replaceOrCreateSecret(
-    namespace: String,
-    secretName: String,
-    keytabs: Set[(String, Path)],
-  ): Either[Throwable, Unit] = {
-    Try {
-      logger.debug(s"Creating secret for $keytabs keytabs")
+  def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): Future[Unit] =
+    Future.fromTry(Try {
+      logger.debug(s"Creating secret for [$keytabPath] keytabs")
       val builder = new SecretBuilder()
         .withNewMetadata()
         .withName(secretName)
         .endMetadata()
         .withType("opaque")
 
-      val secret = keytabs
+      val secret = keytabPath
         .foldLeft(builder) {
-          case (acc, (key, path)) =>
-            val byteArray = Files.readAllBytes(path)
-            acc.addToData(key, Base64.getEncoder.encodeToString(byteArray))
+          case (acc, keytab) =>
+            val byteArray = Files.readAllBytes(Paths.get(keytab.path))
+            acc.addToData(keytab.name, Base64.getEncoder.encodeToString(byteArray))
 
         }
         .build()
       client.secrets().inNamespace(namespace).createOrReplace(secret)
       logger.info(s"Secret $secretName has been created in $namespace")
-    }.toEither
-  }
+    })
+
+  def findMissing(meta: Metadata, secretNames: Set[String]): Future[Set[String]] = {
+    Future.sequence(secretNames.map { name =>
+      Future(
+        Try(Option(client.secrets().inNamespace(meta.namespace).withName(name).get())).toOption.flatten
+          .fold(name.some)(_ => None)
+      )
+    })
+  }.map(_.flatten)
 }

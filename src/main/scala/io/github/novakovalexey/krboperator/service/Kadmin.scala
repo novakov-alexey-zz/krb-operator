@@ -8,21 +8,24 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
 import io.github.novakovalexey.k8soperator4s.common.Metadata
 import io.github.novakovalexey.krboperator.service.Kadmin._
-import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg, Principal}
+import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 import okhttp3.Response
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
-final case class KerberosState(podName: String, principals: List[(Principal, KeytabPath)])
+final case class KerberosState(podName: String, keytabPaths: List[KeytabMeta])
+final case class KadminContext(realm: String, meta: Metadata, adminPwd: String, keytabPrefix: String)
 
 object Kadmin {
   type KeytabPath = String
 
-  def keytabToPath(k: String): String =
-    s"/tmp/$k"
+  def keytabToPath(prefix: String, name: String): String =
+    s"/tmp/$prefix/$name"
 }
+
+case class KeytabMeta(name: String, path: KeytabPath)
 
 class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
   private val listener = new ExecListener {
@@ -36,46 +39,58 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       logger.info(s"listener closed with code '$code', reason: $reason")
   }
 
-  def initKerberos(meta: Metadata, krb: Krb, adminPwd: String): Future[KerberosState] =
+  def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): Future[KerberosState] =
     Future {
       client
         .pods()
-        .inNamespace(meta.namespace)
-        .withLabel("deploymentconfig", meta.name)
+        .inNamespace(context.meta.namespace)
+        .withLabel("deploymentconfig", context.meta.name)
         .list()
         .getItems
         .asScala
         .headOption
     }.flatMap {
       case Some(p) =>
+        val podName = p.getMetadata.getName
         Future {
-          logger.debug(s"Waiting for POD in ${meta.namespace} namespace to be ready")
+          logger.debug(s"Waiting for POD in ${context.meta.namespace} namespace to be ready")
           //TODO: wait is blocking operation, need to write own wait function
-          client.resource(p).inNamespace(meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
-          logger.debug(s"POD '${p.getMetadata.getName}' is ready")
-          addKeytabs(meta, krb, adminPwd, p.getMetadata.getName)
+          client.resource(p).inNamespace(context.meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
+          logger.debug(s"POD '$podName' is ready")
+
+          val groupedByKeytab = principals.groupBy(_.keytab)
+          lazy val keytabsPrefix = Random.alphanumeric.take(10).mkString
+
+          //TODO: this should be re-done via cats Validated
+          groupedByKeytab.foldLeft(Right(List.empty[KeytabMeta]): Either[String, List[KeytabMeta]]) {
+            case (acc, (keytab, principals)) =>
+              addKeytab(context, keytabsPrefix, keytab, principals, podName)
+                .flatMap(path => acc.map(l => l :+ KeytabMeta(keytab, path)))
+          }
         }.flatMap {
           case Right(paths) =>
-            logger.info("keytabs added")
-            Future.successful(KerberosState(p.getMetadata.getName, paths))
+            logger.info(s"keytabs added: $paths")
+            Future.successful(KerberosState(podName, paths))
           case Left(e) =>
-            Future.failed(new RuntimeException(s"Failed to create keytab(s) via kadmin: $e"))
+            Future.failed(new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $e"))
         }
       case None =>
-        logger.error(s"Failed to init Kerberos for $meta")
-        Future.failed(new RuntimeException("No KDC POD found"))
+        val msg = s"No KDC POD found for ${context.meta}"
+        logger.error(msg)
+        Future.failed(new RuntimeException(msg))
     }
 
-  private def addKeytabs(
-    meta: Metadata,
-    krb: Krb,
-    adminPwd: String,
+  private def addKeytab(
+    context: KadminContext,
+    prefix: String,
+    keytab: String,
+    principals: List[Principal],
     podName: String
-  ): Either[String, List[(Principal, String)]] = {
+  ): Either[String, KeytabPath] = {
     val errStream = new ByteArrayOutputStream()
-    val exe = client
+    val watch = client
       .pods()
-      .inNamespace(meta.namespace)
+      .inNamespace(context.meta.namespace)
       .withName(podName)
       .inContainer(cfg.kadminContainer)
       .readingInput(System.in)
@@ -90,32 +105,38 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       logger.error(s"Error occurred: $errors")
       Left(errors)
     } else {
-      val paths = krb.principals.map { p =>
-        createPrincipal(krb, adminPwd, exe, p)
-        p -> createKeytab(krb, adminPwd, exe, p)
+      val keytabPath = keytabToPath(prefix, keytab)
+      principals.foreach { p =>
+        //TODO: check whether Watch needs to be closed every time
+        createPrincipal(context.realm, context.adminPwd, watch, p)
+        createKeytab(context.realm, context.adminPwd, watch, p.name, keytabPath)
       }
-      Right(paths)
+      Right(keytabPath)
     }
   }
 
-  private def createKeytab(krb: Krb, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {
-    val keytabPath = keytabToPath(p.keytab)
+  private def createKeytab(
+    realm: String,
+    adminPwd: String,
+    exe: Execable[String, ExecWatch],
+    principal: String,
+    keytab: KeytabPath
+  ): Unit = {
     val keytabCmd = cfg.addKeytabCmd
-      .replaceAll("\\$realm", krb.realm)
-      .replaceAll("\\$path", keytabPath)
-      .replaceAll("\\$username", p.name)
+      .replaceAll("\\$realm", realm)
+      .replaceAll("\\$path", keytab)
+      .replaceAll("\\$username", principal)
     val addKeytab = s"echo '$adminPwd' | $keytabCmd"
-    exe.exec("bash", "-c", addKeytab)
-    keytabPath
+    exe.exec("bash", "-c", addKeytab).close()
   }
 
-  private def createPrincipal(krb: Krb, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {
+  private def createPrincipal(realm: String, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal): Unit = {
     val addCmd = cfg.addPrincipalCmd
-      .replaceAll("\\$realm", krb.realm)
+      .replaceAll("\\$realm", realm)
       .replaceAll("\\$username", p.name)
       .replaceAll("\\$password", if (isRandomPassword(p.password)) randomString else p.value)
     val addPrincipal = s"echo '$adminPwd' | $addCmd"
-    exe.exec("bash", "-c", addPrincipal)
+    exe.exec("bash", "-c", addPrincipal).close()
   }
 
   private def isRandomPassword(password: String): Boolean =
