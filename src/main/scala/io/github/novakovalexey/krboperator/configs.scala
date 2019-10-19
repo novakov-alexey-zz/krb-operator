@@ -11,13 +11,13 @@ import pureconfig.{loadConfig, CamelCase, ConfigFieldMapping}
 
 final case class KrbOperatorCfg(
   krb5Image: String,
-  templatePath: String,
+  k8sSpecsDir: String,
   adminPrincipal: String,
   addPrincipalCmd: String,
   addKeytabCmd: String,
   kadminContainer: String,
   k8sResourcesPrefix: String,
-  secretForAdminPwd: String,
+  secretNameForAdminPwd: String,
   secretKeyForAdminPwd: String
 )
 

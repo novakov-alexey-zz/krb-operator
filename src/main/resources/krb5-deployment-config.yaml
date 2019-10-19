@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: ${KDC_SERVER}
+spec:
+  replicas: 1
+  selector:
+    deploymentconfig: ${KDC_SERVER}
+  strategy:
+    activeDeadlineSeconds: 21600
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      labels:
+        deploymentconfig: ${KDC_SERVER}
+    spec:
+      containers:
+        - env:
+            - name: RUN_MODE
+              value: kadmin
+            - name: KRB5_KDC
+              value: ${KDC_SERVER}
+            - name: KRB5_REALM
+              value: ${KRB5_REALM}
+          image: ${KRB5_IMAGE}
+          imagePullPolicy: Always
+          name: kadmin
+          readinessProbe:
+            exec:
+              command:
+                - ls
+                - /etc/krb5.conf
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          ports:
+            - containerPort: 8888
+              protocol: TCP
+            - containerPort: 8888
+              protocol: UDP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /dev/shm
+              name: share
+        - env:
+            - name: RUN_MODE
+              value: kdc
+            - name: KRB5_KDC
+              value: ${KDC_SERVER}
+            - name: KRB5_REALM
+              value: ${KRB5_REALM}
+          image: ${KRB5_IMAGE}
+          imagePullPolicy: Always
+          name: kdc
+          ports:
+            - containerPort: 8749
+              protocol: TCP
+            - containerPort: 8749
+              protocol: UDP
+            - containerPort: 8464
+              protocol: UDP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /dev/shm
+              name: share
+            - mountPath: /var/kerberos/krb5kdc.d
+              name: kdc-config
+            - mountPath: /etc/krb.conf.d
+              name: krb5-config
+            - mountPath: /etc/krb5/secret/krb5_pass
+              subPath: krb5_pass
+              name: admin-secret
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - emptyDir:
+            medium: Memory
+          name: share
+        - emptyDir: {}
+          name: kdc-config
+        - emptyDir: {}
+          name: krb5-config
+        - name: admin-secret
+          secret:
+            secretName: ${PREFIX}-krb-admin-pwd

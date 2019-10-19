@@ -23,7 +23,7 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
         client
           .secrets()
           .inNamespace(meta.namespace)
-          .withName(operatorCfg.secretForAdminPwd)
+          .withName(operatorCfg.secretNameForAdminPwd)
           .get()
       )
     }.flatMap {
@@ -38,14 +38,14 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
             Future.failed(new RuntimeException("Failed to get admin password"))
         }
       case None =>
-        Future.failed(new RuntimeException(s"Failed to find a secret '${operatorCfg.secretForAdminPwd}'"))
+        Future.failed(new RuntimeException(s"Failed to find a secret '${operatorCfg.secretNameForAdminPwd}'"))
     }
     f.failed.foreach(t => logger.error("Failed to get admin password", t))
     f
   }
 
   def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): Future[Unit] =
-    Future.fromTry(Try {
+    Future {
       logger.debug(s"Creating secret for [$keytabPath] keytabs")
       val builder = new SecretBuilder()
         .withNewMetadata()
@@ -56,19 +56,18 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
       val secret = keytabPath
         .foldLeft(builder) {
           case (acc, keytab) =>
-            val byteArray = Files.readAllBytes(Paths.get(keytab.path))
-            acc.addToData(keytab.name, Base64.getEncoder.encodeToString(byteArray))
-
+            val bytes = Files.readAllBytes(Paths.get(keytab.path))
+            acc.addToData(keytab.name, Base64.getEncoder.encodeToString(bytes))
         }
         .build()
       client.secrets().inNamespace(namespace).createOrReplace(secret)
       logger.info(s"Secret $secretName has been created in $namespace")
-    })
+    }
 
   def findMissing(meta: Metadata, secretNames: Set[String]): Future[Set[String]] = {
     Future.sequence(secretNames.map { name =>
       Future(
-        Try(Option(client.secrets().inNamespace(meta.namespace).withName(name).get())).toOption.flatten
+        Try(client.secrets().inNamespace(meta.namespace).withName(name).get()).toOption
           .fold(name.some)(_ => None)
       )
     })

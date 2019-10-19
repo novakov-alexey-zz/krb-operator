@@ -1,6 +1,7 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.io.File
+import java.io.ByteArrayInputStream
+import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 
 import com.typesafe.scalalogging.LazyLogging
@@ -13,59 +14,47 @@ import io.github.novakovalexey.k8soperator4s.common.Metadata
 import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters._
-import scala.util.Try
+import scala.io.Source
+import scala.util.{Random, Try, Using}
 
-class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg)(implicit ec: ExecutionContext)
-    extends LazyLogging {
+class Template(client: OpenShiftClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
 
-  private val template = new File(operatorCfg.templatePath)
-
-  private def params(kdcName: String, realm: String) = Map(
-    "KRB5_IMAGE" -> operatorCfg.krb5Image,
-    "PREFIX" -> operatorCfg.k8sResourcesPrefix,
-    "KDC_SERVER" -> kdcName,
-    "KRB5_REALM" -> realm
+  private val adminSecretSpec = replaceParams(
+    Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
+    Map("PREFIX" -> cfg.k8sResourcesPrefix, "ADMIN_PWD" -> randomPassword)
   )
 
-  def resourceList(kdcName: String, realm: String): KubernetesList = {
-    client.templates
-      .load(template)
-      .process(params(kdcName, realm).asJava)
-  }
+  private def deploymentConfigSpec(kdcName: String, krbRealm: String) = replaceParams(
+    Paths.get(cfg.k8sSpecsDir, "krb5-deployment-config.yaml"),
+    Map("KDC_SERVER" -> kdcName, "KRB5_REALM" -> krbRealm, "KRB5_IMAGE" -> cfg.krb5Image)
+  )
 
-  def createOrReplace(krb: Krb, meta: Metadata) =
-    Future {
-      val resources = resourceList(meta.name, krb.realm)
-      client
-        .resourceList(resources)
-        .inNamespace(meta.namespace)
-        .createOrReplaceAnd()
-        .waitUntilReady(1, TimeUnit.MINUTES)
+  private def serviceSpec(kdcName: String) =
+    replaceParams(Paths.get(cfg.k8sSpecsDir, "krb5-service.yaml"), Map("KDC_SERVER" -> kdcName))
 
-      logger.info(s"template submitted for: $krb")
-      ()
+  private def replaceParams(pathToFile: Path, params: Map[String, String]): String =
+    Using.resource(
+      Source
+        .fromFile(pathToFile.toFile)
+    ) {
+      _.getLines().map { l =>
+        params.view.foldLeft(l) {
+          case (acc, (k, v)) =>
+            acc.replaceAll("\\$\\{" + k + "\\}", v)
+        }
+      }.toList
+        .mkString("\n")
     }
+
+  private def randomPassword = Random.alphanumeric.take(10).mkString
 
   def delete(krb: Krb, meta: Metadata): Future[Unit] = {
     val f = Future {
-      val resources = resourceList(meta.name, krb.realm)
-      lazy val count = Option(resources.getItems).map(_.size()).getOrElse(0)
-      logger.info(s"number of resources to delete: $count")
-
-      val deleteByTemplate = client
-        .resourceList(resources)
-        .inNamespace(meta.namespace)
-        .delete()
-
       val deleteDeployment = findDeploymentConfig(meta).fold(false)(_.delete())
-      val deleteService: Boolean = findService(meta).fold(false)(_.delete())
-      //val deleteImageStream: lang.Boolean = findImageStream(meta).delete()
-
-      logger.info(s"Found resources to delete? ${deleteByTemplate || deleteDeployment || deleteService}")
-      ()
+      val deleteService = findService(meta).fold(false)(_.delete())
+      val deleteAdminSecret = findAdminSecret(meta).fold(false)(_.delete())
+      logger.info(s"Found resources to delete? ${deleteDeployment || deleteService || deleteAdminSecret}")
     }
-
     f.failed.foreach(e => logger.error("Failed to delete", e))
     f
   }
@@ -93,11 +82,25 @@ class Template(client: OpenShiftClient, operatorCfg: KrbOperatorCfg)(implicit ec
     Try(client.services().inNamespace(meta.namespace).withName(meta.name)).toOption
 
   def findAdminSecret(meta: Metadata): Option[Resource[Secret, DoneableSecret]] =
-    Try(client.secrets().inNamespace(meta.namespace).withName(operatorCfg.secretForAdminPwd)).toOption
+    Try(client.secrets().inNamespace(meta.namespace).withName(cfg.secretNameForAdminPwd)).toOption
 
-  def createService(meta: Metadata): Future[Unit] = ???
+  def createService(kdcName: String): Future[Unit] =
+    Future {
+      val is = new ByteArrayInputStream(serviceSpec(kdcName).getBytes())
+      val s = client.services().load(is).get()
+      client.services().createOrReplace(s)
+    }
 
-  def createDeploymentConfig(meta: Metadata): Future[Unit] = ???
+  def createDeploymentConfig(kdcName: String, realm: String): Future[Unit] =
+    Future {
+      val is = new ByteArrayInputStream(deploymentConfigSpec(kdcName, realm).getBytes)
+      val dc = client.deploymentConfigs().load(is).get()
+      client.deploymentConfigs().createOrReplace(dc)
+    }
 
-  def createAdminSecret(meta: Metadata): Future[Unit] = ???
+  def createAdminSecret(meta: Metadata): Future[Unit] =
+    Future {
+      val s = client.secrets().load(new ByteArrayInputStream(adminSecretSpec.getBytes)).get()
+      client.secrets().inNamespace(meta.namespace).createOrReplace(s)
+    }
 }

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${KDC_SERVER}
+spec:
+  ports:
+    - name: kerberos-kdc-tcp
+      port: 88
+      protocol: TCP
+      targetPort: 8888
+    - name: kerberos-kdc
+      port: 88
+      protocol: UDP
+      targetPort: 8888
+    - name: kpasswd
+      port: 464
+      protocol: UDP
+      targetPort: 8464
+    - name: kadmin
+      port: 749
+      protocol: UDP
+      targetPort: 8749
+    - name: kadmin-tcp
+      port: 749
+      protocol: TCP
+      targetPort: 8749
+  selector:
+    deploymentconfig: ${KDC_SERVER}
+  sessionAffinity: None
+  type: ClusterIP

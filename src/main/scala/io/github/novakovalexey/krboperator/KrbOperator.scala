@@ -31,14 +31,22 @@ class KrbOperator(
           logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
           Future.successful(())
         case None =>
-          template.createDeploymentConfig(meta).flatMap(_ => template.waitForDeployment(meta))
+          for {
+            _ <- template.createDeploymentConfig(meta.name, krb.realm)
+            _ <- template.waitForDeployment(meta)
+            _ = logger.info(s"deployment ${meta.name} created")
+          } yield ()
       }
 
       _ <- template.findService(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Service is found, so skipping its creation")
           Future.successful(())
-        case None => template.createService(meta)
+        case None =>
+          for {
+            _ <- template.createService(meta.name)
+            _ = logger.info(s"Service ${meta.name} created")
+          } yield ()
       }
 
       _ <- template.findAdminSecret(meta) match {
@@ -46,7 +54,10 @@ class KrbOperator(
           logger.info(s"[${meta.name}] Admin Secret is found, so skipping its creation")
           Future.successful(())
         case None =>
-          template.createAdminSecret(meta)
+          for {
+            _ <- template.createAdminSecret(meta)
+            _ = logger.info(s"Admin secret ${meta.name} created")
+          } yield ()
       }
 
       missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret).toSet)
@@ -67,6 +78,7 @@ class KrbOperator(
                   new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
                 )
               _ <- secret.createSecret(meta.namespace, state.keytabPaths, secretName)
+              _ = logger.info(s"Keytab secret $secretName created")
             } yield ()
         }
         Future.sequence(r)
