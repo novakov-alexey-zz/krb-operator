@@ -1,6 +1,6 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.nio.file.{Files, Paths}
+import java.nio.file.Files
 import java.util.Base64
 
 import cats.syntax.option._
@@ -56,7 +56,7 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
       val secret = keytabPath
         .foldLeft(builder) {
           case (acc, keytab) =>
-            val bytes = Files.readAllBytes(Paths.get(keytab.path))
+            val bytes = Files.readAllBytes(keytab.path)
             acc.addToData(keytab.name, Base64.getEncoder.encodeToString(bytes))
         }
         .build()
@@ -65,11 +65,12 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
     }
 
   def findMissing(meta: Metadata, secretNames: Set[String]): Future[Set[String]] = {
-    Future.sequence(secretNames.map { name =>
+    val secrets = secretNames.map { name =>
       Future(
         Try(client.secrets().inNamespace(meta.namespace).withName(name).get()).toOption
           .fold(name.some)(_ => None)
       )
-    })
-  }.map(_.flatten)
+    }
+    Future.sequence(secrets).map(_.flatten)
+  }
 }

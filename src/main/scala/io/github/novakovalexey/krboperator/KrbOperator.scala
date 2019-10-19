@@ -1,12 +1,11 @@
 package io.github.novakovalexey.krboperator
 
-import java.nio.file.Paths
+import java.nio.file.Path
 
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.k8soperator4s.CrdOperator
 import io.github.novakovalexey.k8soperator4s.common.{CrdConfig, Metadata}
-import io.github.novakovalexey.krboperator.service.Kadmin.KeytabPath
 import io.github.novakovalexey.krboperator.service._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -77,7 +76,7 @@ class KrbOperator(
                 Future.failed(
                   new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
                 )
-              _ <- secret.createSecret(meta.namespace, state.keytabPaths, secretName)
+              _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
               _ = logger.info(s"Keytab secret $secretName created")
             } yield ()
         }
@@ -86,16 +85,16 @@ class KrbOperator(
     } yield ()
   }
 
-  private def copyKeytabs(namespace: String, state: KerberosState): Future[List[(KeytabPath, Boolean)]] =
-    Future(state.keytabPaths.foldLeft(List.empty[(KeytabPath, Boolean)]) {
+  private def copyKeytabs(namespace: String, state: KerberosState): Future[List[(Path, Boolean)]] =
+    Future(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
       case (acc, keytab) =>
         logger.debug(s"Copying keytab '$keytab' into $namespace:${state.podName} POD")
         acc :+ (keytab.path, client.pods
           .inNamespace(namespace)
           .withName(state.podName)
           .inContainer(operatorCfg.kadminContainer)
-          .file(keytab.path)
-          .copy(Paths.get(keytab.path)))
+          .file(keytab.path.toString)
+          .copy(keytab.path))
     })
 
   override def onDelete(krb: Krb, meta: Metadata): Unit = {

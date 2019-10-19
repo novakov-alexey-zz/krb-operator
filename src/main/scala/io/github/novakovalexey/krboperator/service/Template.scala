@@ -11,26 +11,35 @@ import io.fabric8.openshift.api.model.{DeploymentConfig, DoneableDeploymentConfi
 import io.fabric8.openshift.client.OpenShiftClient
 import io.fabric8.openshift.client.dsl.DeployableScalableResource
 import io.github.novakovalexey.k8soperator4s.common.Metadata
+import io.github.novakovalexey.krboperator.service.Template._
 import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
 import scala.util.{Random, Try, Using}
 
+object Template {
+  val PrefixParam = "PREFIX"
+  val AdminPwdParam = "ADMIN_PWD"
+  val KdcServerParam = "KDC_SERVER"
+  val KrbRealmParam = "KRB5_REALM"
+  val Krb5Image = "KRB5_IMAGE"
+}
+
 class Template(client: OpenShiftClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
 
   private val adminSecretSpec = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
-    Map("PREFIX" -> cfg.k8sResourcesPrefix, "ADMIN_PWD" -> randomPassword)
+    Map(PrefixParam -> cfg.k8sResourcesPrefix, AdminPwdParam -> randomPassword)
   )
 
   private def deploymentConfigSpec(kdcName: String, krbRealm: String) = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-deployment-config.yaml"),
-    Map("KDC_SERVER" -> kdcName, "KRB5_REALM" -> krbRealm, "KRB5_IMAGE" -> cfg.krb5Image)
+    Map(KdcServerParam -> kdcName, KrbRealmParam -> krbRealm, Krb5Image -> cfg.krb5Image)
   )
 
   private def serviceSpec(kdcName: String) =
-    replaceParams(Paths.get(cfg.k8sSpecsDir, "krb5-service.yaml"), Map("KDC_SERVER" -> kdcName))
+    replaceParams(Paths.get(cfg.k8sSpecsDir, "krb5-service.yaml"), Map(KdcServerParam -> kdcName))
 
   private def replaceParams(pathToFile: Path, params: Map[String, String]): String =
     Using.resource(

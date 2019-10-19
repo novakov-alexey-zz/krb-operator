@@ -1,8 +1,10 @@
 package io.github.novakovalexey.krboperator.service
 
 import java.io.ByteArrayOutputStream
+import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 
+import cats.syntax.either._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
@@ -15,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
-final case class KerberosState(podName: String, keytabPaths: List[KeytabMeta])
+final case class KerberosState(podName: String, keytabs: List[KeytabMeta])
 final case class KadminContext(realm: String, meta: Metadata, adminPwd: String, keytabPrefix: String)
 
 object Kadmin {
@@ -25,7 +27,7 @@ object Kadmin {
     s"/tmp/$prefix/$name"
 }
 
-case class KeytabMeta(name: String, path: KeytabPath)
+case class KeytabMeta(name: String, path: Path)
 
 class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
   private val listener = new ExecListener {
@@ -59,13 +61,13 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
           logger.debug(s"POD '$podName' is ready")
 
           val groupedByKeytab = principals.groupBy(_.keytab)
-          lazy val keytabsPrefix = Random.alphanumeric.take(10).mkString
+          lazy val uniquePrefix = Random.alphanumeric.take(10).mkString
 
           //TODO: this should be re-done via cats Validated
-          groupedByKeytab.foldLeft(Right(List.empty[KeytabMeta]): Either[String, List[KeytabMeta]]) {
+          groupedByKeytab.foldLeft(Either.right[String, List[KeytabMeta]](List.empty)) {
             case (acc, (keytab, principals)) =>
-              addKeytab(context, keytabsPrefix, keytab, principals, podName)
-                .flatMap(path => acc.map(l => l :+ KeytabMeta(keytab, path)))
+              addKeytab(context, uniquePrefix, keytab, principals, podName)
+                .flatMap(path => acc.map(_ :+ KeytabMeta(keytab, path)))
           }
         }.flatMap {
           case Right(paths) =>
@@ -86,7 +88,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
     keytab: String,
     principals: List[Principal],
     podName: String
-  ): Either[String, KeytabPath] = {
+  ): Either[String, Path] = {
     val errStream = new ByteArrayOutputStream()
     val watch = client
       .pods()
@@ -111,7 +113,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
         createPrincipal(context.realm, context.adminPwd, watch, p)
         createKeytab(context.realm, context.adminPwd, watch, p.name, keytabPath)
       }
-      Right(keytabPath)
+      Right(Paths.get(keytabPath))
     }
   }
 
