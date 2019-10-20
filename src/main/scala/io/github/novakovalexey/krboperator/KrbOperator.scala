@@ -25,29 +25,16 @@ class KrbOperator(
     logger.info(s"add event: $krb, $meta")
 
     for {
-      _ <- template.findDeploymentConfig(meta) match {
-        case Some(_) =>
-          logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
-          Future.successful(())
-        case None =>
-          for {
-            _ <- template.createDeploymentConfig(meta.name, krb.realm)
-            _ <- template.waitForDeployment(meta)
-            _ = logger.info(s"deployment ${meta.name} created")
-          } yield ()
-      }
-
       _ <- template.findService(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Service is found, so skipping its creation")
           Future.successful(())
         case None =>
           for {
-            _ <- template.createService(meta.name)
+            _ <- template.createService(meta)
             _ = logger.info(s"Service ${meta.name} created")
           } yield ()
       }
-
       _ <- template.findAdminSecret(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Admin Secret is found, so skipping its creation")
@@ -56,6 +43,17 @@ class KrbOperator(
           for {
             _ <- template.createAdminSecret(meta)
             _ = logger.info(s"Admin secret ${meta.name} created")
+          } yield ()
+      }
+      _ <- template.findDeploymentConfig(meta) match {
+        case Some(_) =>
+          logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
+          Future.successful(())
+        case None =>
+          for {
+            _ <- template.createDeploymentConfig(meta, krb.realm)
+            _ <- template.waitForDeployment(meta)
+            _ = logger.info(s"deployment ${meta.name} created")
           } yield ()
       }
 

@@ -96,3 +96,15 @@ spec:
         - name: admin-secret
           secret:
             secretName: ${PREFIX}-krb-admin-pwd
+  test: false
+  triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+          - kdc
+          - kadmin
+        from:
+          kind: ImageStreamTag
+          name: ${KDC_SERVER}:latest
+      type: ImageChange

@@ -67,7 +67,7 @@ class SecretService(client: KubernetesClient, operatorCfg: KrbOperatorCfg)(impli
   def findMissing(meta: Metadata, secretNames: Set[String]): Future[Set[String]] = {
     val secrets = secretNames.map { name =>
       Future(
-        Try(client.secrets().inNamespace(meta.namespace).withName(name).get()).toOption
+        Option(client.secrets().inNamespace(meta.namespace).withName(name).get())
           .fold(name.some)(_ => None)
       )
     }
