@@ -98,13 +98,5 @@ spec:
             secretName: ${PREFIX}-krb-admin-pwd
   test: false
   triggers:
+    #TODO: remove this trigger
     - type: ConfigChange
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-          - kdc
-          - kadmin
-        from:
-          kind: ImageStreamTag
-          name: ${KDC_SERVER}:latest
-      type: ImageChange
