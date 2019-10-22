@@ -1,6 +1,6 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, File}
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 
@@ -15,7 +15,7 @@ import okhttp3.Response
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
-import scala.util.Random
+import scala.util.{Random, Using}
 
 final case class KerberosState(podName: String, keytabs: List[KeytabMeta])
 final case class KadminContext(realm: String, meta: Metadata, adminPwd: String, keytabPrefix: String)
@@ -32,13 +32,13 @@ case class KeytabMeta(name: String, path: Path)
 class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
   private val listener = new ExecListener {
     override def onOpen(response: Response): Unit =
-      logger.info(s"on open: ${response.body().string()}")
+      logger.debug(s"on open: ${response.body().string()}")
 
     override def onFailure(t: Throwable, response: Response): Unit =
       logger.error(s"Failure on 'pod exec': ${response.body().string()}", t)
 
     override def onClose(code: Int, reason: String): Unit =
-      logger.info(s"listener closed with code '$code', reason: $reason")
+      logger.debug(s"listener closed with code '$code', reason: $reason")
   }
 
   def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): Future[KerberosState] =
@@ -90,7 +90,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
     podName: String
   ): Either[String, Path] = {
     val errStream = new ByteArrayOutputStream()
-    val watch = client
+    val exe = client
       .pods()
       .inNamespace(context.meta.namespace)
       .withName(podName)
@@ -101,21 +101,27 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       .withTTY()
       .usingListener(listener)
 
-    val errors = new String(errStream.toByteArray)
+    val keytabPath = keytabToPath(prefix, keytab)
+    principals.foreach { p =>
+      runCommand(List("mkdir", new File(keytabPath).getParent), exe)
+      createPrincipal(context.realm, context.adminPwd, exe, p)
+      createKeytab(context.realm, context.adminPwd, exe, p.name, keytabPath)
+    }
 
+    val errors = errStream.toByteArray
     if (errors.nonEmpty) {
-      logger.error(s"Error occurred: $errors")
-      Left(errors)
+      val errStr = new String(errors)
+      logger.error(s"Error occurred: $errStr")
+      Left(errStr)
     } else {
-      val keytabPath = keytabToPath(prefix, keytab)
-      principals.foreach { p =>
-        //TODO: check whether Watch needs to be closed every time
-        createPrincipal(context.realm, context.adminPwd, watch, p)
-        createKeytab(context.realm, context.adminPwd, watch, p.name, keytabPath)
-      }
       Right(Paths.get(keytabPath))
     }
   }
+
+  private def runCommand(cmd: List[String], exe: Execable[String, ExecWatch]): Unit =
+    Using.resource(exe.exec(cmd: _*)) { _ =>
+      ()
+    }
 
   private def createKeytab(
     realm: String,
@@ -129,7 +135,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       .replaceAll("\\$path", keytab)
       .replaceAll("\\$username", principal)
     val addKeytab = s"echo '$adminPwd' | $keytabCmd"
-    exe.exec("bash", "-c", addKeytab).close()
+    runCommand(List("bash", "-c", addKeytab), exe)
   }
 
   private def createPrincipal(realm: String, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal): Unit = {
@@ -138,7 +144,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       .replaceAll("\\$username", p.name)
       .replaceAll("\\$password", if (isRandomPassword(p.password)) randomString else p.value)
     val addPrincipal = s"echo '$adminPwd' | $addCmd"
-    exe.exec("bash", "-c", addPrincipal).close()
+    runCommand(List("bash", "-c", addPrincipal), exe)
   }
 
   private def isRandomPassword(password: String): Boolean =

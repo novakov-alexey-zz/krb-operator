@@ -7,4 +7,9 @@ object Main extends App {
   val mod = new Module
   val f = mod.scheduler.start()
   Await.ready(f, 1.minute)
+
+  sys.addShutdownHook({
+    mod.scheduler.stop()
+    mod.client.close()
+  })
 }

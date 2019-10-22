@@ -24,9 +24,10 @@ object Template {
   val Krb5Image = "KRB5_IMAGE"
 }
 
-class Template(client: OpenShiftClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
+class Template(client: OpenShiftClient, secret: SecretService, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext)
+    extends LazyLogging {
 
-  private val adminSecretSpec = replaceParams(
+  val adminSecretSpec: String = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
     Map(PrefixParam -> cfg.k8sResourcesPrefix, AdminPwdParam -> randomPassword)
   )
@@ -62,37 +63,33 @@ class Template(client: OpenShiftClient, cfg: KrbOperatorCfg)(implicit ec: Execut
 
   def delete(krb: Krb, meta: Metadata): Future[Unit] = {
     val f = Future {
-      val deleteDeployment: Boolean = findDeploymentConfig(meta).fold(false)(d => client.deploymentConfigs().delete(d))
+      val deleteDeployment = findDeploymentConfig(meta).fold(false)(d => client.deploymentConfigs().delete(d))
       val deleteService = findService(meta).fold(false)(client.services().delete(_))
-      val deleteAdminSecret = findAdminSecret(meta).fold(false)(client.secrets().delete(_))
+      val deleteAdminSecret = secret.findAdminSecret(meta).fold(false)(client.secrets().delete(_))
       logger.info(s"Found resources to delete? ${deleteDeployment || deleteService || deleteAdminSecret}")
     }
     f.failed.foreach(e => logger.error("Failed to delete", e))
     f
   }
 
-  def waitForDeployment(metadata: Metadata): Future[Unit] = {
-    val f = Future(findDeploymentConfig(metadata)).flatMap {
+  def waitForDeployment(metadata: Metadata): Future[Unit] =
+    Future(findDeploymentConfig(metadata)).flatMap {
       case Some(d) =>
         val duration = (1, TimeUnit.MINUTES)
         logger.info(s"Going to wait for deployment until ready: $duration")
+        //TODO: wait is blocking operation
         client.resource(d).waitUntilReady(duration._1, duration._2)
         logger.info(s"deployment is ready: $metadata")
         Future.successful(())
       case None =>
         Future.failed(new RuntimeException("Failed to get deployment config"))
     }
-    f.failed.map(e => new RuntimeException(s"Failed to wait for deployment: $metadata", e))
-  }
 
   def findDeploymentConfig(meta: Metadata): Option[DeploymentConfig] =
     Option(client.deploymentConfigs().inNamespace(meta.namespace).withName(meta.name).get())
 
   def findService(meta: Metadata): Option[Service] =
     Option(client.services().inNamespace(meta.namespace).withName(meta.name).get())
-
-  def findAdminSecret(meta: Metadata): Option[Secret] =
-    Option(client.secrets().inNamespace(meta.namespace).withName(cfg.secretNameForAdminPwd).get())
 
   def createService(meta: Metadata): Future[Unit] =
     Future {
@@ -108,11 +105,5 @@ class Template(client: OpenShiftClient, cfg: KrbOperatorCfg)(implicit ec: Execut
       val is = new ByteArrayInputStream(content.getBytes)
       val dc = client.deploymentConfigs().load(is)
       client.deploymentConfigs().inNamespace(meta.namespace).createOrReplace(dc.get())
-    }
-
-  def createAdminSecret(meta: Metadata): Future[Unit] =
-    Future {
-      val s = client.secrets().load(new ByteArrayInputStream(adminSecretSpec.getBytes)).get()
-      client.secrets().inNamespace(meta.namespace).createOrReplace(s)
     }
 }

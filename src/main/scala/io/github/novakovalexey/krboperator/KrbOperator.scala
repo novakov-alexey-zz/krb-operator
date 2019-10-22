@@ -35,13 +35,13 @@ class KrbOperator(
             _ = logger.info(s"Service ${meta.name} created")
           } yield ()
       }
-      _ <- template.findAdminSecret(meta) match {
+      _ <- secret.findAdminSecret(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Admin Secret is found, so skipping its creation")
           Future.successful(())
         case None =>
           for {
-            _ <- template.createAdminSecret(meta)
+            _ <- secret.createAdminSecret(meta, template.adminSecretSpec)
             _ = logger.info(s"Admin secret ${meta.name} created")
           } yield ()
       }
@@ -97,6 +97,9 @@ class KrbOperator(
 
   override def onDelete(krb: Krb, meta: Metadata): Unit = {
     logger.info(s"delete event: $krb, $meta")
-    template.delete(krb, meta)
+    for {
+      _ <- template.delete(krb, meta)
+      _ <- secret.deleteSecrets(meta.namespace)
+    } yield ()
   }
 }
