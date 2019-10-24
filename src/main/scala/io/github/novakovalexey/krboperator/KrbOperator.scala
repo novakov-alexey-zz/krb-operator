@@ -86,7 +86,7 @@ class KrbOperator(
   private def copyKeytabs(namespace: String, state: KerberosState): Future[List[(Path, Boolean)]] =
     Future(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
       case (acc, keytab) =>
-        logger.debug(s"Copying keytab '$keytab' into $namespace:${state.podName} POD")
+        logger.debug(s"Copying keytab '$keytab' into $namespace/${state.podName} POD")
         acc :+ (keytab.path, client.pods
           .inNamespace(namespace)
           .withName(state.podName)
