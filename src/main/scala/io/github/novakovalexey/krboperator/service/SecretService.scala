@@ -4,24 +4,25 @@ import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.util.Base64
 
+import cats.effect.Sync
+import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.github.novakovalexey.k8soperator4s.common.Metadata
+import io.github.novakovalexey.k8soperator.Metadata
 import io.github.novakovalexey.krboperator.KrbOperatorCfg
 import io.github.novakovalexey.krboperator.service.SecretService._
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 
 object SecretService {
   val principalSecretLabel: Map[String, String] = Map("app" -> "krb")
 }
 
-class SecretService(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
+class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
 
-  def getAdminPwd(meta: Metadata): Future[String] = {
-    val f = Future {
+  def getAdminPwd(meta: Metadata): F[String] =
+    F.delay {
       Option(
         client
           .secrets()
@@ -36,19 +37,18 @@ class SecretService(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: 
           case Some(p) =>
             logger.info(s"Found admin password for $meta")
             val decoded = Base64.getDecoder.decode(p)
-            Future.successful(new String(decoded))
+            F.pure(new String(decoded))
           case None =>
-            Future.failed(new RuntimeException("Failed to get admin password"))
+            F.raiseError[String](new RuntimeException("Failed to get admin password"))
         }
       case None =>
-        Future.failed(new RuntimeException(s"Failed to find a secret '${cfg.secretNameForAdminPwd}'"))
+        F.raiseError[String](new RuntimeException(s"Failed to find a secret '${cfg.secretNameForAdminPwd}'"))
+    }.onError { case t: Throwable =>
+      F.delay(logger.error("Failed to get admin password", t))
     }
-    f.failed.foreach(t => logger.error("Failed to get admin password", t))
-    f
-  }
 
-  def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): Future[Unit] =
-    Future {
+  def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): F[Unit] =
+    F.delay {
       logger.debug(s"Creating secret for [${keytabPath.mkString(",")}] keytabs")
       val builder = new SecretBuilder()
         .withNewMetadata()
@@ -68,26 +68,26 @@ class SecretService(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: 
       logger.info(s"Secret $secretName has been created in $namespace")
     }
 
-  def deleteSecrets(namespace: String): Future[Unit] =
-    Future(client.secrets().inNamespace(namespace).withLabels(principalSecretLabel.asJava).delete())
+  def deleteSecrets(namespace: String): F[Unit] =
+    F.delay(client.secrets().inNamespace(namespace).withLabels(principalSecretLabel.asJava).delete())
 
-  def findMissing(meta: Metadata, expectedSecrets: Set[String]): Future[Set[String]] = {
+  def findMissing(meta: Metadata, expectedSecrets: Set[String]): F[Set[String]] = {
     logger.debug(s"Expected secrets to find: ${expectedSecrets.mkString(",")}")
 
-    Future(Option(client.secrets().inNamespace(meta.namespace).withLabels(principalSecretLabel.asJava).list())).flatMap {
+    F.delay(Option(client.secrets().inNamespace(meta.namespace).withLabels(principalSecretLabel.asJava).list())).flatMap {
       case Some(l) =>
         val foundSecrets = Option(l.getItems).map(_.asScala).getOrElse(List.empty).map(_.getMetadata.getName).toSet
-        Future.successful(expectedSecrets -- foundSecrets)
+        F.pure(expectedSecrets -- foundSecrets)
       case None =>
-        Future.successful(expectedSecrets)
+        F.pure(expectedSecrets)
     }
   }
 
   def findAdminSecret(meta: Metadata): Option[Secret] =
     Option(client.secrets().inNamespace(meta.namespace).withName(cfg.secretNameForAdminPwd).get())
 
-  def createAdminSecret(meta: Metadata, adminSecretSpec: String): Future[Unit] =
-    Future {
+  def createAdminSecret(meta: Metadata, adminSecretSpec: String): F[Unit] =
+    F.delay {
       val s = client.secrets().load(new ByteArrayInputStream(adminSecretSpec.getBytes)).get()
       client.secrets().inNamespace(meta.namespace).createOrReplace(s)
     }

@@ -4,16 +4,16 @@ import java.io.{ByteArrayOutputStream, File}
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 
-import cats.syntax.either._
+import cats.effect.Sync
+import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
-import io.github.novakovalexey.k8soperator4s.common.Metadata
+import io.github.novakovalexey.k8soperator.Metadata
 import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 import okhttp3.Response
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters._
 import scala.util.{Random, Using}
 
@@ -29,7 +29,7 @@ object Kadmin {
 
 case class KeytabMeta(name: String, path: Path)
 
-class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext) extends LazyLogging {
+class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
   private val listener = new ExecListener {
     override def onOpen(response: Response): Unit =
       logger.debug(s"on open: ${response.body().string()}")
@@ -41,8 +41,8 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
       logger.debug(s"listener closed with code '$code', reason: $reason")
   }
 
-  def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): Future[KerberosState] =
-    Future {
+  def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): F[KerberosState] =
+    F.delay {
       client
         .pods()
         .inNamespace(context.meta.namespace)
@@ -54,7 +54,7 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
     }.flatMap {
       case Some(p) =>
         val podName = p.getMetadata.getName
-        Future {
+        F.delay {
           logger.debug(s"Waiting for POD in ${context.meta.namespace} namespace to be ready")
           //TODO: wait is blocking operation, need to write own wait function
           client.resource(p).inNamespace(context.meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
@@ -72,14 +72,14 @@ class Kadmin(client: KubernetesClient, cfg: KrbOperatorCfg)(implicit ec: Executi
         }.flatMap {
           case Right(paths) =>
             logger.info(s"keytabs added: $paths")
-            Future.successful(KerberosState(podName, paths))
+            F.pure(KerberosState(podName, paths))
           case Left(e) =>
-            Future.failed(new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $e"))
+            F.raiseError(new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $e"))
         }
       case None =>
         val msg = s"No KDC POD found for ${context.meta}"
         logger.error(msg)
-        Future.failed(new RuntimeException(msg))
+        F.raiseError(new RuntimeException(msg))
     }
 
   private def addKeytab(

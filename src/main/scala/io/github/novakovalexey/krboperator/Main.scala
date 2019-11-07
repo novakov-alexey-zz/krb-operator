@@ -1,15 +1,13 @@
 package io.github.novakovalexey.krboperator
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import cats.Parallel
+import cats.effect.{ExitCode, IO, IOApp}
 
-object Main extends App {
-  val mod = new Module
-  val f = mod.scheduler.start()
-  Await.ready(f, 1.minute)
+object Main extends IOApp {
+  implicit val ioPar: Parallel[IO] = cats.effect.IO.ioParallel
 
-  sys.addShutdownHook({
-    mod.scheduler.stop()
-    mod.client.close()
-  })
+  override def run(args: List[String]): IO[ExitCode] = {
+    val mod = new Module[IO]
+    mod.operator.run
+  }
 }

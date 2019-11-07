@@ -1,13 +1,13 @@
 package io.github.novakovalexey.krboperator
 
+import cats.Parallel
+import cats.effect.ConcurrentEffect
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftConfigBuilder}
-import io.github.novakovalexey.k8soperator4s.Scheduler
-import io.github.novakovalexey.k8soperator4s.common.{AllNamespaces, CrdConfig}
+import io.github.novakovalexey.k8soperator.{AllNamespaces, CrdConfig}
+import io.github.novakovalexey.k8soperator.Operator
 import io.github.novakovalexey.krboperator.service.{Kadmin, SecretService, Template}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class Module {
+class Module[F[_]: ConcurrentEffect: Parallel] {
   val operatorCfg: KrbOperatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
   val client = new DefaultOpenShiftClient(
     new OpenShiftConfigBuilder()
@@ -20,10 +20,10 @@ class Module {
       .build()
   )
 
-  val secret = new SecretService(client, operatorCfg)
-  val template = new Template(client, secret, operatorCfg)
-  val kadmin = new Kadmin(client, operatorCfg)
+  val secret = new SecretService[F](client, operatorCfg)
+  val template = new Template[F](client, secret, operatorCfg)
+  val kadmin = new Kadmin[F](client, operatorCfg)
   val cfg = CrdConfig(classOf[Krb], AllNamespaces, "io.github.novakov-alexey")
-  val operator = new KrbOperator(client, cfg, operatorCfg, template, kadmin, secret)
-  val scheduler = new Scheduler[Krb](operator)
+  val controller = new KrbOperator[F](client, cfg, operatorCfg, template, kadmin, secret)
+  val operator = Operator.ofCrd[F, Krb](cfg, client, controller)
 }

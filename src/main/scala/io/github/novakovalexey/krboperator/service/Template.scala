@@ -4,15 +4,16 @@ import java.io.ByteArrayInputStream
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 
+import cats.effect.Sync
+import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.OpenShiftClient
-import io.github.novakovalexey.k8soperator4s.common.Metadata
+import io.github.novakovalexey.k8soperator.Metadata
 import io.github.novakovalexey.krboperator.service.Template._
 import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
 import scala.util.{Random, Using}
 
@@ -24,7 +25,7 @@ object Template {
   val Krb5Image = "KRB5_IMAGE"
 }
 
-class Template(client: OpenShiftClient, secret: SecretService, cfg: KrbOperatorCfg)(implicit ec: ExecutionContext)
+class Template[F[_]](client: OpenShiftClient, secret: SecretService[F], cfg: KrbOperatorCfg)(implicit F: Sync[F])
     extends LazyLogging {
 
   val adminSecretSpec: String = replaceParams(
@@ -61,28 +62,28 @@ class Template(client: OpenShiftClient, secret: SecretService, cfg: KrbOperatorC
 
   private def randomPassword = Random.alphanumeric.take(10).mkString
 
-  def delete(krb: Krb, meta: Metadata): Future[Unit] = {
-    val f = Future {
+  def delete(krb: Krb, meta: Metadata): F[Unit] =
+    Sync[F].delay {
       val deleteDeployment = findDeploymentConfig(meta).fold(false)(d => client.deploymentConfigs().delete(d))
       val deleteService = findService(meta).fold(false)(client.services().delete(_))
       val deleteAdminSecret = secret.findAdminSecret(meta).fold(false)(client.secrets().delete(_))
       logger.info(s"Found resources to delete? ${deleteDeployment || deleteService || deleteAdminSecret}")
+    }.onError {
+      case e: Throwable =>
+        Sync[F].delay(logger.error("Failed to delete", e))
     }
-    f.failed.foreach(e => logger.error("Failed to delete", e))
-    f
-  }
 
-  def waitForDeployment(metadata: Metadata): Future[Unit] =
-    Future(findDeploymentConfig(metadata)).flatMap {
+  def waitForDeployment(metadata: Metadata): F[Unit] =
+    F.delay(findDeploymentConfig(metadata)).flatMap {
       case Some(d) =>
         val duration = (1, TimeUnit.MINUTES)
         logger.info(s"Going to wait for deployment until ready: $duration")
         //TODO: wait is blocking operation
         client.resource(d).waitUntilReady(duration._1, duration._2)
         logger.info(s"deployment is ready: $metadata")
-        Future.successful(())
+        F.unit
       case None =>
-        Future.failed(new RuntimeException("Failed to get deployment config"))
+        F.raiseError(new RuntimeException("Failed to get deployment config"))
     }
 
   def findDeploymentConfig(meta: Metadata): Option[DeploymentConfig] =
@@ -91,15 +92,15 @@ class Template(client: OpenShiftClient, secret: SecretService, cfg: KrbOperatorC
   def findService(meta: Metadata): Option[Service] =
     Option(client.services().inNamespace(meta.namespace).withName(meta.name).get())
 
-  def createService(meta: Metadata): Future[Unit] =
-    Future {
+  def createService(meta: Metadata): F[Unit] =
+    F.delay {
       val is = new ByteArrayInputStream(serviceSpec(meta.name).getBytes())
       val s = client.services().load(is).get()
       client.services().inNamespace(meta.namespace).createOrReplace(s)
     }
 
-  def createDeploymentConfig(meta: Metadata, realm: String): Future[Unit] =
-    Future {
+  def createDeploymentConfig(meta: Metadata, realm: String): F[Unit] =
+    F.delay {
       val content = deploymentConfigSpec(meta.name, realm)
       logger.debug(s"Creating new config config for KDC: ${meta.name}")
       val is = new ByteArrayInputStream(content.getBytes)

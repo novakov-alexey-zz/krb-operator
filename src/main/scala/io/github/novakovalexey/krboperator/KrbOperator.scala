@@ -2,33 +2,33 @@ package io.github.novakovalexey.krboperator
 
 import java.nio.file.Path
 
+import cats.Parallel
+import cats.effect.ConcurrentEffect
+import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.openshift.client.OpenShiftClient
-import io.github.novakovalexey.k8soperator4s.CrdOperator
-import io.github.novakovalexey.k8soperator4s.common.{CrdConfig, Metadata}
+import io.github.novakovalexey.k8soperator.{Controller, CrdConfig, Metadata}
 import io.github.novakovalexey.krboperator.service._
 
-import scala.concurrent.{ExecutionContext, Future}
-
-class KrbOperator(
+class KrbOperator[F[_]: Parallel](
   client: OpenShiftClient,
   cfg: CrdConfig[Krb],
   operatorCfg: KrbOperatorCfg,
-  template: Template,
-  kadmin: Kadmin,
-  secret: SecretService
-)(implicit ec: ExecutionContext)
-    extends CrdOperator[Krb](cfg)
+  template: Template[F],
+  kadmin: Kadmin[F],
+  secret: SecretService[F]
+)(implicit F: ConcurrentEffect[F])
+    extends Controller[F, Krb]
     with LazyLogging {
 
-  override def onAdd(krb: Krb, meta: Metadata): Unit = {
+  override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
     logger.info(s"add event: $krb, $meta")
 
     for {
       _ <- template.findService(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Service is found, so skipping its creation")
-          Future.successful(())
+          F.unit
         case None =>
           for {
             _ <- template.createService(meta)
@@ -38,7 +38,7 @@ class KrbOperator(
       _ <- secret.findAdminSecret(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Admin Secret is found, so skipping its creation")
-          Future.successful(())
+          F.unit
         case None =>
           for {
             _ <- secret.createAdminSecret(meta, template.adminSecretSpec)
@@ -48,7 +48,7 @@ class KrbOperator(
       _ <- template.findDeploymentConfig(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
-          Future.successful(())
+          F.unit
         case None =>
           for {
             _ <- template.createDeploymentConfig(meta, krb.realm)
@@ -69,22 +69,22 @@ class KrbOperator(
               state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd, secretName))
               statuses <- copyKeytabs(meta.namespace, state)
               _ <- if (statuses.forall(_._2 == true))
-                Future.successful(())
+                F.unit
               else
-                Future.failed(
+                F.raiseError[Unit](
                   new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
                 )
               _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
               _ = logger.info(s"Keytab secret $secretName created")
             } yield ()
         }
-        Future.sequence(r)
+        r.toList.parSequence
       }
     } yield ()
   }
 
-  private def copyKeytabs(namespace: String, state: KerberosState): Future[List[(Path, Boolean)]] =
-    Future(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
+  private def copyKeytabs(namespace: String, state: KerberosState): F[List[(Path, Boolean)]] =
+    F.delay(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
       case (acc, keytab) =>
         logger.debug(s"Copying keytab '$keytab' into $namespace/${state.podName} POD")
         acc :+ (keytab.path, client.pods
@@ -95,7 +95,7 @@ class KrbOperator(
           .copy(keytab.path))
     })
 
-  override def onDelete(krb: Krb, meta: Metadata): Unit = {
+  override def onDelete(krb: Krb, meta: Metadata): F[Unit] = {
     logger.info(s"delete event: $krb, $meta")
     for {
       _ <- template.delete(krb, meta)

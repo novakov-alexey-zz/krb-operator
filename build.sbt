@@ -1,6 +1,6 @@
 import NativePackagerHelper._
 
-name := "krb-operator"
+name := "krb5-operator"
 version := "0.1"
 scalaVersion := "2.13.1"
 ThisBuild / organization := "io.github.novakov-alexey"
@@ -17,7 +17,6 @@ lazy val root = (project in file("."))
       scalaLogging,
       logbackClassic,
       pureConfig,
-      cats
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
   )

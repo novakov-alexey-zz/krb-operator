@@ -24,6 +24,6 @@ object Dependencies extends AutoPlugin {
     val osClient                 = "io.fabric8"                % "openshift-client"            % openshiftClientVersion
     val pureConfig               = "com.github.pureconfig"     %%  "pureconfig"                % pureConfigVersion
     val codecs                   = "commons-codec"             % "commons-codec"               % codecsVersion
-    val operatorLib              = "io.github.novakov-alexey" %% "k8s-operator4s-core"         % operatorLibVersion
+    val operatorLib              = "io.github.novakov-alexey" %% "k8s-operator"                % operatorLibVersion
   }
 }
