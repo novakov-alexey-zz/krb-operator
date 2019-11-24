@@ -1,6 +1,6 @@
 import NativePackagerHelper._
 
-name := "krb5-operator"
+name := "kerberos-operator"
 version := "0.1"
 scalaVersion := "2.13.1"
 ThisBuild / organization := "io.github.novakov-alexey"

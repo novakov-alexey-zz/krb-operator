@@ -27,24 +27,24 @@ class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implici
         client
           .secrets()
           .inNamespace(meta.namespace)
-          .withName(cfg.secretNameForAdminPwd)
+          .withName(cfg.adminPwd.secretName)
           .get()
       )
     }.flatMap {
       case Some(s) =>
-        val pwd = Option(s.getData).flatMap(_.asScala.toMap.get(cfg.secretKeyForAdminPwd))
+        val pwd = Option(s.getData).flatMap(_.asScala.toMap.get(cfg.adminPwd.secretKey))
         pwd match {
           case Some(p) =>
             logger.info(s"Found admin password for $meta")
             val decoded = Base64.getDecoder.decode(p)
             F.pure(new String(decoded))
           case None =>
-            F.raiseError[String](new RuntimeException("Failed to get admin password"))
+            F.raiseError[String](new RuntimeException("Failed to get an admin password"))
         }
       case None =>
-        F.raiseError[String](new RuntimeException(s"Failed to find a secret '${cfg.secretNameForAdminPwd}'"))
+        F.raiseError[String](new RuntimeException(s"Failed to find a secret '${cfg.adminPwd.secretName}'"))
     }.onError { case t: Throwable =>
-      F.delay(logger.error("Failed to get admin password", t))
+      F.delay(logger.error("Failed to get an admin password", t))
     }
 
   def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): F[Unit] =
@@ -84,7 +84,7 @@ class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implici
   }
 
   def findAdminSecret(meta: Metadata): Option[Secret] =
-    Option(client.secrets().inNamespace(meta.namespace).withName(cfg.secretNameForAdminPwd).get())
+    Option(client.secrets().inNamespace(meta.namespace).withName(cfg.adminPwd.secretName).get())
 
   def createAdminSecret(meta: Metadata, adminSecretSpec: String): F[Unit] =
     F.delay {

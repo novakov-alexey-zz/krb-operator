@@ -6,15 +6,16 @@ import cats.Parallel
 import cats.effect.ConcurrentEffect
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
+import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.k8soperator.{Controller, CrdConfig, Metadata}
 import io.github.novakovalexey.krboperator.service._
 
-class KrbOperator[F[_]: Parallel](
+class KrbController[F[_]: Parallel](
   client: OpenShiftClient,
   cfg: CrdConfig[Krb],
   operatorCfg: KrbOperatorCfg,
-  template: Template[F],
+  template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
   secret: SecretService[F]
 )(implicit F: ConcurrentEffect[F])
@@ -45,13 +46,13 @@ class KrbOperator[F[_]: Parallel](
             _ = logger.info(s"Admin secret ${meta.name} created")
           } yield ()
       }
-      _ <- template.findDeploymentConfig(meta) match {
+      _ <- template.findDeployment(meta) match {
         case Some(_) =>
           logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
           F.unit
         case None =>
           for {
-            _ <- template.createDeploymentConfig(meta, krb.realm)
+            _ <- template.createDeployment(meta, krb.realm)
             _ <- template.waitForDeployment(meta)
             _ = logger.info(s"deployment ${meta.name} created")
           } yield ()

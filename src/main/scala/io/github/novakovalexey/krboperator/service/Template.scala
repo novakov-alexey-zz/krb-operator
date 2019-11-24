@@ -8,6 +8,7 @@ import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model._
+import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.k8soperator.Metadata
@@ -23,18 +24,68 @@ object Template {
   val KdcServerParam = "KDC_SERVER"
   val KrbRealmParam = "KRB5_REALM"
   val Krb5Image = "KRB5_IMAGE"
+  val DeploymentSelector = "deploymentconfig"
 }
 
-class Template[F[_]](client: OpenShiftClient, secret: SecretService[F], cfg: KrbOperatorCfg)(implicit F: Sync[F])
-    extends LazyLogging {
+trait DeploymentResource[T] {
+  def delete(client: OpenShiftClient, resource: T): Boolean
+
+  def findDeployment(client: OpenShiftClient, meta: Metadata): Option[T]
+
+  def createOrReplace(client: OpenShiftClient, is: ByteArrayInputStream, meta: Metadata): T
+
+  val deploymentSpecName: String
+}
+
+object DeploymentResource {
+
+  implicit val deployment: DeploymentResource[Deployment] = new DeploymentResource[Deployment] {
+    override def delete(client: OpenShiftClient, d: Deployment): Boolean =
+      client.apps().deployments().delete(d)
+
+    override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[Deployment] =
+      Option(client.apps().deployments().inNamespace(meta.namespace).withName(meta.name).get())
+
+    override def createOrReplace(client: OpenShiftClient, is: ByteArrayInputStream, meta: Metadata): Deployment = {
+      val dc = client.apps().deployments().load(is)
+      client.apps().deployments().inNamespace(meta.namespace).createOrReplace(dc.get())
+    }
+
+    override val deploymentSpecName: String = "krb5-deployment.yaml"
+  }
+
+  implicit val deploymentConfig: DeploymentResource[DeploymentConfig] = new DeploymentResource[DeploymentConfig] {
+    override def delete(client: OpenShiftClient, d: DeploymentConfig): Boolean =
+      client.deploymentConfigs().delete(d)
+
+    override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[DeploymentConfig] =
+      Option(client.deploymentConfigs().inNamespace(meta.namespace).withName(meta.name).get())
+
+    override def createOrReplace(
+      client: OpenShiftClient,
+      is: ByteArrayInputStream,
+      meta: Metadata
+    ): DeploymentConfig = {
+      val dc = client.deploymentConfigs().load(is)
+      client.deploymentConfigs().inNamespace(meta.namespace).createOrReplace(dc.get())
+    }
+
+    override val deploymentSpecName: String = "krb5-deploymentconfig.yaml"
+  }
+}
+
+class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretService[F], cfg: KrbOperatorCfg)(
+  implicit F: Sync[F],
+  D: DeploymentResource[T]
+) extends LazyLogging {
 
   val adminSecretSpec: String = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
     Map(PrefixParam -> cfg.k8sResourcesPrefix, AdminPwdParam -> randomPassword)
   )
 
-  private def deploymentConfigSpec(kdcName: String, krbRealm: String) = replaceParams(
-    Paths.get(cfg.k8sSpecsDir, "krb5-deployment-config.yaml"),
+  private def deploymentSpec(kdcName: String, krbRealm: String) = replaceParams(
+    Paths.get(cfg.k8sSpecsDir, D.deploymentSpecName),
     Map(
       KdcServerParam -> kdcName,
       KrbRealmParam -> krbRealm,
@@ -64,7 +115,7 @@ class Template[F[_]](client: OpenShiftClient, secret: SecretService[F], cfg: Krb
 
   def delete(krb: Krb, meta: Metadata): F[Unit] =
     Sync[F].delay {
-      val deleteDeployment = findDeploymentConfig(meta).fold(false)(d => client.deploymentConfigs().delete(d))
+      val deleteDeployment = findDeployment(meta).fold(false)(d => D.delete(client, d))
       val deleteService = findService(meta).fold(false)(client.services().delete(_))
       val deleteAdminSecret = secret.findAdminSecret(meta).fold(false)(client.secrets().delete(_))
       logger.info(s"Found resources to delete? ${deleteDeployment || deleteService || deleteAdminSecret}")
@@ -74,7 +125,7 @@ class Template[F[_]](client: OpenShiftClient, secret: SecretService[F], cfg: Krb
     }
 
   def waitForDeployment(metadata: Metadata): F[Unit] =
-    F.delay(findDeploymentConfig(metadata)).flatMap {
+    F.delay(findDeployment(metadata)).flatMap {
       case Some(d) =>
         val duration = (1, TimeUnit.MINUTES)
         logger.info(s"Going to wait for deployment until ready: $duration")
@@ -83,11 +134,11 @@ class Template[F[_]](client: OpenShiftClient, secret: SecretService[F], cfg: Krb
         logger.info(s"deployment is ready: $metadata")
         F.unit
       case None =>
-        F.raiseError(new RuntimeException("Failed to get deployment config"))
+        F.raiseError(new RuntimeException("Failed to get deployment"))
     }
 
-  def findDeploymentConfig(meta: Metadata): Option[DeploymentConfig] =
-    Option(client.deploymentConfigs().inNamespace(meta.namespace).withName(meta.name).get())
+  def findDeployment(meta: Metadata): Option[T] =
+    D.findDeployment(client, meta)
 
   def findService(meta: Metadata): Option[Service] =
     Option(client.services().inNamespace(meta.namespace).withName(meta.name).get())
@@ -99,12 +150,11 @@ class Template[F[_]](client: OpenShiftClient, secret: SecretService[F], cfg: Krb
       client.services().inNamespace(meta.namespace).createOrReplace(s)
     }
 
-  def createDeploymentConfig(meta: Metadata, realm: String): F[Unit] =
+  def createDeployment(meta: Metadata, realm: String): F[Unit] =
     F.delay {
-      val content = deploymentConfigSpec(meta.name, realm)
-      logger.debug(s"Creating new config config for KDC: ${meta.name}")
+      val content = deploymentSpec(meta.name, realm)
+      logger.debug(s"Creating new deployment for KDC: ${meta.name}")
       val is = new ByteArrayInputStream(content.getBytes)
-      val dc = client.deploymentConfigs().load(is)
-      client.deploymentConfigs().inNamespace(meta.namespace).createOrReplace(dc.get())
+      D.createOrReplace(client, is, meta)
     }
 }

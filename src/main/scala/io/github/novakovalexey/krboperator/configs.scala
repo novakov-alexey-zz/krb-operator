@@ -17,9 +17,10 @@ final case class KrbOperatorCfg(
   addKeytabCmd: String,
   kadminContainer: String,
   k8sResourcesPrefix: String,
-  secretNameForAdminPwd: String,
-  secretKeyForAdminPwd: String
+  adminPwd: AdminPassword
 )
+
+final case class AdminPassword(secretName: String, secretKey: String)
 
 object AppConfig extends StrictLogging {
   private val parseOptions = ConfigParseOptions.defaults().setAllowMissing(false)

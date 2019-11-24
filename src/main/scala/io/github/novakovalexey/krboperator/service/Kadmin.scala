@@ -19,6 +19,7 @@ import scala.util.{Random, Using}
 
 final case class KerberosState(podName: String, keytabs: List[KeytabMeta])
 final case class KadminContext(realm: String, meta: Metadata, adminPwd: String, keytabPrefix: String)
+final case class KeytabMeta(name: String, path: Path)
 
 object Kadmin {
   type KeytabPath = String
@@ -26,8 +27,6 @@ object Kadmin {
   def keytabToPath(prefix: String, name: String): String =
     s"/tmp/$prefix/$name"
 }
-
-case class KeytabMeta(name: String, path: Path)
 
 class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
   private val listener = new ExecListener {
@@ -46,7 +45,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
       client
         .pods()
         .inNamespace(context.meta.namespace)
-        .withLabel("deploymentconfig", context.meta.name)
+        .withLabel(Template.DeploymentSelector, context.meta.name)
         .list()
         .getItems
         .asScala
@@ -71,7 +70,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
           }
         }.flatMap {
           case Right(paths) =>
-            logger.info(s"keytabs added: $paths")
+            logger.info(s"keytab files added: $paths")
             F.pure(KerberosState(podName, paths))
           case Left(e) =>
             F.raiseError(new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $e"))
