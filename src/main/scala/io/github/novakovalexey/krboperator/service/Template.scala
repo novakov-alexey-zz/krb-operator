@@ -2,19 +2,20 @@ package io.github.novakovalexey.krboperator.service
 
 import java.io.ByteArrayInputStream
 import java.nio.file.{Path, Paths}
-import java.util.concurrent.TimeUnit
 
-import cats.effect.Sync
+import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.apps.Deployment
+import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.k8soperator.Metadata
 import io.github.novakovalexey.krboperator.service.Template._
 import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
 
+import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.{Random, Using}
 
@@ -34,6 +35,8 @@ trait DeploymentResource[T] {
 
   def createOrReplace(client: OpenShiftClient, is: ByteArrayInputStream, meta: Metadata): T
 
+  def isDeploymentReady(resource: T): Boolean
+
   val deploymentSpecName: String
 }
 
@@ -52,6 +55,9 @@ object DeploymentResource {
     }
 
     override val deploymentSpecName: String = "krb5-deployment.yaml"
+
+    override def isDeploymentReady(resource: Deployment): Boolean =
+      Readiness.isDeploymentReady(resource)
   }
 
   implicit val deploymentConfig: DeploymentResource[DeploymentConfig] = new DeploymentResource[DeploymentConfig] {
@@ -71,11 +77,15 @@ object DeploymentResource {
     }
 
     override val deploymentSpecName: String = "krb5-deploymentconfig.yaml"
+
+    override def isDeploymentReady(resource: DeploymentConfig): Boolean =
+      Readiness.isDeploymentConfigReady(resource)
   }
 }
 
 class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretService[F], cfg: KrbOperatorCfg)(
   implicit F: Sync[F],
+  T: Timer[F],
   D: DeploymentResource[T]
 ) extends LazyLogging {
 
@@ -124,18 +134,40 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
         Sync[F].delay(logger.error("Failed to delete", e))
     }
 
-  def waitForDeployment(metadata: Metadata): F[Unit] =
-    F.delay(findDeployment(metadata)).flatMap {
-      case Some(d) =>
-        val duration = (1, TimeUnit.MINUTES)
-        logger.info(s"Going to wait for deployment until ready: $duration")
-        //TODO: wait is blocking operation
-        client.resource(d).waitUntilReady(duration._1, duration._2)
-        logger.info(s"deployment is ready: $metadata")
-        F.unit
-      case None =>
-        F.raiseError(new RuntimeException("Failed to get deployment"))
-    }
+  def waitForDeployment(metadata: Metadata): F[Unit] = {
+    val duration = 1.minute
+    F.delay(logger.info(s"Going to wait for deployment until ready: $duration")) *>
+      waitFor(duration) { () =>
+        findDeployment(metadata).exists(D.isDeploymentReady)
+      }.flatMap { ready =>
+        if (ready) {
+          F.delay(logger.info(s"deployment is ready: $metadata"))
+        } else F.raiseError(new RuntimeException("Failed to wait for deployment is ready"))
+      }
+  }
+
+  private def waitFor(maxDuration: FiniteDuration)(action: () => Boolean): F[Boolean] = {
+    def loop(spent: FiniteDuration, maxDuration: FiniteDuration): F[Boolean] =
+      F.delay {
+        action()
+      }.flatMap { done =>
+        if (!done && spent >= maxDuration) {
+          false.pure[F]
+        } else if (!done) {
+          val pause = 500.milliseconds
+          F.delay(
+            if (spent.toMillis != 0 && spent.toMillis % 5000 == 0)
+              logger.debug(s"Already waiting time: ${spent.toSeconds} secs / $maxDuration")
+            else ()
+          ) *>
+            T.sleep(pause) *> loop(spent + pause, maxDuration)
+        } else {
+          F.delay(logger.debug(s"Was waiting for ${spent.toMinutes} mins")) *> true.pure[F]
+        }
+      }
+
+    loop(0.millisecond, maxDuration)
+  }
 
   def findDeployment(meta: Metadata): Option[T] =
     D.findDeployment(client, meta)

@@ -8,8 +8,15 @@ import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
+import io.github.novakovalexey.k8soperator.common.AnsiColors
 import io.github.novakovalexey.k8soperator.{Controller, CrdConfig, Metadata}
 import io.github.novakovalexey.krboperator.service._
+import KrbController._
+
+object KrbController {
+  def checkMark: String =
+    s"${AnsiColors.gr}\u2714${AnsiColors.xx}"
+}
 
 class KrbController[F[_]: Parallel](
   client: OpenShiftClient,
@@ -28,33 +35,33 @@ class KrbController[F[_]: Parallel](
     for {
       _ <- template.findService(meta) match {
         case Some(_) =>
-          logger.info(s"[${meta.name}] Service is found, so skipping its creation")
+          logger.info(s"$checkMark [${meta.name}] Service is found, so skipping its creation")
           F.unit
         case None =>
           for {
             _ <- template.createService(meta)
-            _ = logger.info(s"Service ${meta.name} created")
+            _ = logger.info(s"$checkMark Service ${meta.name} created")
           } yield ()
       }
       _ <- secret.findAdminSecret(meta) match {
         case Some(_) =>
-          logger.info(s"[${meta.name}] Admin Secret is found, so skipping its creation")
+          logger.info(s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation")
           F.unit
         case None =>
           for {
             _ <- secret.createAdminSecret(meta, template.adminSecretSpec)
-            _ = logger.info(s"Admin secret ${meta.name} created")
+            _ = logger.info(s"$checkMark Admin secret ${meta.name} created")
           } yield ()
       }
       _ <- template.findDeployment(meta) match {
         case Some(_) =>
-          logger.info(s"[${meta.name}] Deployment is found, so skipping its creation")
+          logger.info(s"$checkMark [${meta.name}] Deployment is found, so skipping its creation")
           F.unit
         case None =>
           for {
             _ <- template.createDeployment(meta, krb.realm)
             _ <- template.waitForDeployment(meta)
-            _ = logger.info(s"deployment ${meta.name} created")
+            _ = logger.info(s"$checkMark deployment ${meta.name} created")
           } yield ()
       }
 
@@ -76,7 +83,7 @@ class KrbController[F[_]: Parallel](
                   new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
                 )
               _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
-              _ = logger.info(s"Keytab secret $secretName created")
+              _ = logger.info(s"$checkMark Keytab secret $secretName created")
             } yield ()
         }
         r.toList.parSequence

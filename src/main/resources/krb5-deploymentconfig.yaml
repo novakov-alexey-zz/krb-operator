@@ -98,5 +98,4 @@ spec:
             secretName: ${PREFIX}-krb-admin-pwd
   test: false
   triggers:
-    #TODO: remove this trigger
     - type: ConfigChange

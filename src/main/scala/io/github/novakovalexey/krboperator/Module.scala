@@ -1,7 +1,7 @@
 package io.github.novakovalexey.krboperator
 
 import cats.Parallel
-import cats.effect.ConcurrentEffect
+import cats.effect.{ConcurrentEffect, Timer}
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftConfigBuilder}
@@ -9,7 +9,7 @@ import io.github.novakovalexey.k8soperator.common.CrdOperator
 import io.github.novakovalexey.k8soperator.{AllNamespaces, CrdConfig, Operator}
 import io.github.novakovalexey.krboperator.service.{Kadmin, SecretService, Template}
 
-class Module[F[_]: ConcurrentEffect: Parallel] {
+class Module[F[_]: ConcurrentEffect: Parallel: Timer] {
   val operatorCfg: KrbOperatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
   val client = new DefaultOpenShiftClient(
     new OpenShiftConfigBuilder()
