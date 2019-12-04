@@ -3,30 +3,27 @@ package io.github.novakovalexey.krboperator
 import java.nio.file.Path
 
 import cats.Parallel
-import cats.effect.ConcurrentEffect
+import cats.effect.{ConcurrentEffect, Sync}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
-import io.github.novakovalexey.k8soperator.common.AnsiColors
 import io.github.novakovalexey.k8soperator.{Controller, CrdConfig, Metadata}
 import io.github.novakovalexey.krboperator.service._
 import KrbController._
 
 object KrbController {
-  def checkMark: String =
-    s"${AnsiColors.gr}\u2714${AnsiColors.xx}"
+  val checkMark: String = "\u2714"
 }
 
-class KrbController[F[_]: Parallel](
+class KrbController[F[_]: Parallel: ConcurrentEffect](
   client: OpenShiftClient,
   cfg: CrdConfig[Krb],
   operatorCfg: KrbOperatorCfg,
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
   secret: SecretService[F]
-)(implicit F: ConcurrentEffect[F])
-    extends Controller[F, Krb]
+) extends Controller[F, Krb]
     with LazyLogging {
 
   override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
@@ -110,4 +107,6 @@ class KrbController[F[_]: Parallel](
       _ <- secret.deleteSecrets(meta.namespace)
     } yield ()
   }
+
+  override protected[this] implicit val F: Sync[F] = Sync[F]
 }

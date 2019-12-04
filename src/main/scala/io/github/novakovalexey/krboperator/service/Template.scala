@@ -157,7 +157,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
           val pause = 500.milliseconds
           F.delay(
             if (spent.toMillis != 0 && spent.toMillis % 5000 == 0)
-              logger.debug(s"Already waiting time: ${spent.toSeconds} secs / $maxDuration")
+              logger.debug(s"Already spent time: ${spent.toSeconds} secs / $maxDuration")
             else ()
           ) *>
             T.sleep(pause) *> loop(spent + pause, maxDuration)
