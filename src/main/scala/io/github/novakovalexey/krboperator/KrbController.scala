@@ -6,11 +6,11 @@ import cats.Parallel
 import cats.effect.{ConcurrentEffect, Sync}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
+import freya.{Controller, CrdConfig, Metadata}
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
-import io.github.novakovalexey.k8soperator.{Controller, CrdConfig, Metadata}
+import io.github.novakovalexey.krboperator.KrbController._
 import io.github.novakovalexey.krboperator.service._
-import KrbController._
 
 object KrbController {
   val checkMark: String = "\u2714"
@@ -23,7 +23,8 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
   secret: SecretService[F]
-) extends Controller[F, Krb]
+)(implicit F: Sync[F])
+    extends Controller[F, Krb]
     with LazyLogging {
 
   override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
@@ -107,6 +108,4 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       _ <- secret.deleteSecrets(meta.namespace)
     } yield ()
   }
-
-  override protected[this] implicit val F: Sync[F] = Sync[F]
 }

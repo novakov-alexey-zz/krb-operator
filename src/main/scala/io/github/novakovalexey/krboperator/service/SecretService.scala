@@ -7,9 +7,9 @@ import java.util.Base64
 import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
+import freya.Metadata
 import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.github.novakovalexey.k8soperator.Metadata
 import io.github.novakovalexey.krboperator.KrbOperatorCfg
 import io.github.novakovalexey.krboperator.service.SecretService._
 
@@ -43,8 +43,9 @@ class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implici
         }
       case None =>
         F.raiseError[String](new RuntimeException(s"Failed to find a secret '${cfg.adminPwd.secretName}'"))
-    }.onError { case t: Throwable =>
-      F.delay(logger.error("Failed to get an admin password", t))
+    }.onError {
+      case t: Throwable =>
+        F.delay(logger.error("Failed to get an admin password", t))
     }
 
   def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): F[Unit] =
@@ -74,13 +75,14 @@ class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implici
   def findMissing(meta: Metadata, expectedSecrets: Set[String]): F[Set[String]] = {
     logger.debug(s"Expected secrets to find: ${expectedSecrets.mkString(",")}")
 
-    F.delay(Option(client.secrets().inNamespace(meta.namespace).withLabels(principalSecretLabel.asJava).list())).flatMap {
-      case Some(l) =>
-        val foundSecrets = Option(l.getItems).map(_.asScala).getOrElse(List.empty).map(_.getMetadata.getName).toSet
-        F.pure(expectedSecrets -- foundSecrets)
-      case None =>
-        F.pure(expectedSecrets)
-    }
+    F.delay(Option(client.secrets().inNamespace(meta.namespace).withLabels(principalSecretLabel.asJava).list()))
+      .flatMap {
+        case Some(l) =>
+          val foundSecrets = Option(l.getItems).map(_.asScala).getOrElse(List.empty).map(_.getMetadata.getName).toSet
+          F.pure(expectedSecrets -- foundSecrets)
+        case None =>
+          F.pure(expectedSecrets)
+      }
   }
 
   def findAdminSecret(meta: Metadata): Option[Secret] =

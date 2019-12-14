@@ -11,7 +11,7 @@ resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/
 lazy val root = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
-      operatorLib,
+      freya,
       codecs,
       osClient,
       scalaLogging,

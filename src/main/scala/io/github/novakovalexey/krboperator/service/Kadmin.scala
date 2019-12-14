@@ -7,9 +7,9 @@ import java.util.concurrent.TimeUnit
 import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
+import freya.Metadata
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
-import io.github.novakovalexey.k8soperator.Metadata
 import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 import okhttp3.Response
