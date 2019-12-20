@@ -41,5 +41,5 @@ spec:
           image: io.github.novakovalexey/krb-operator:latest
           env:
             - name: KRB5_IMAGE
-              value: docker-registry.default.svc:5000/yp-kss/krb5:latest
+              value: alexeyn/krb5:latest
           imagePullPolicy: IfNotPresent

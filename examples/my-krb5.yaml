@@ -2,7 +2,7 @@ apiVersion: io.github.novakov-alexey/v1
 kind: Krb
 metadata:
   name: my-krb
-  namespace: yp-kss
+  namespace: test
 spec:
   realm: EXAMPLE.COM
   principals:
