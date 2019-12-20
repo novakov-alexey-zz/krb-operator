@@ -2,7 +2,8 @@ package io.github.novakovalexey.krboperator
 
 import cats.Parallel
 import cats.effect.{ExitCode, IO, IOApp}
-import freya.Times
+import freya.Retry.Times
+
 
 object Main extends IOApp {
   implicit val ioPar: Parallel[IO] = cats.effect.IO.ioParallel

@@ -6,7 +6,8 @@ import cats.Parallel
 import cats.effect.{ConcurrentEffect, Sync}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.{Controller, CrdConfig, Metadata}
+import freya.OperatorCfg.Crd
+import freya.{Controller, Metadata}
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.krboperator.KrbController._
@@ -18,7 +19,7 @@ object KrbController {
 
 class KrbController[F[_]: Parallel: ConcurrentEffect](
   client: OpenShiftClient,
-  cfg: CrdConfig[Krb],
+  cfg: Crd[Krb],
   operatorCfg: KrbOperatorCfg,
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],

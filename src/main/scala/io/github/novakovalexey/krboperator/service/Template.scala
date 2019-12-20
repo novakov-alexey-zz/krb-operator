@@ -42,9 +42,9 @@ trait DeploymentResource[T] {
 
 object DeploymentResource {
 
-  implicit val deployment: DeploymentResource[Deployment] = new DeploymentResource[Deployment] {
+  implicit val k8sDeployment: DeploymentResource[Deployment] = new DeploymentResource[Deployment] {
     override def delete(client: OpenShiftClient, d: Deployment): Boolean =
-      client.apps().deployments().delete(d)
+      client.apps().deployments().inNamespace(d.getMetadata.getNamespace).delete(d)
 
     override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[Deployment] =
       Option(client.apps().deployments().inNamespace(meta.namespace).withName(meta.name).get())
@@ -60,9 +60,9 @@ object DeploymentResource {
       Readiness.isDeploymentReady(resource)
   }
 
-  implicit val deploymentConfig: DeploymentResource[DeploymentConfig] = new DeploymentResource[DeploymentConfig] {
+  implicit val openShiftDeployment: DeploymentResource[DeploymentConfig] = new DeploymentResource[DeploymentConfig] {
     override def delete(client: OpenShiftClient, d: DeploymentConfig): Boolean =
-      client.deploymentConfigs().delete(d)
+      client.deploymentConfigs().inNamespace(d.getMetadata.getNamespace).delete(d)
 
     override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[DeploymentConfig] =
       Option(client.deploymentConfigs().inNamespace(meta.namespace).withName(meta.name).get())
@@ -126,8 +126,9 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
   def delete(krb: Krb, meta: Metadata): F[Unit] =
     Sync[F].delay {
       val deleteDeployment = findDeployment(meta).fold(false)(d => D.delete(client, d))
-      val deleteService = findService(meta).fold(false)(client.services().delete(_))
-      val deleteAdminSecret = secret.findAdminSecret(meta).fold(false)(client.secrets().delete(_))
+      val deleteService = findService(meta).fold(false)(client.services().inNamespace(meta.namespace).delete(_))
+      val deleteAdminSecret =
+        secret.findAdminSecret(meta).fold(false)(client.secrets().inNamespace(meta.namespace).delete(_))
       logger.info(s"Found resources to delete? ${deleteDeployment || deleteService || deleteAdminSecret}")
     }.onError {
       case e: Throwable =>
