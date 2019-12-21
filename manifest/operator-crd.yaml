@@ -3,20 +3,47 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: krb-operator
+  namespace: test
+  labels:
+    app: krb-operator
 ---
-#TODO: this binding to powerful need to describe only required actions
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: krb-operator-edit-resources
-roleRef:
-  kind: ClusterRole
-  name: cluster-admin
-  apiGroup: ""
+  name: krb-operator
+  labels:
+    app: krb-operator
 subjects:
   - kind: ServiceAccount
     name: krb-operator
-    namespace: default
+    namespace: test
+roleRef:
+  kind: ClusterRole
+  name: krb-operator
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: krb-operator
+rules:
+  # "" - the core API group
+  - apiGroups: ["", "authorization.k8s.io", "extensions"]
+    resources: ["pods", "services", "configmaps", "secrets", "pods/exec", "deploymentconfigs"]
+    verbs: ["get", "watch", "list", "create", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["io.github.novakov-alexey"]
+    resources: ["krbs"]
+    verbs: ["watch"]
+  # for openshift
+  - apiGroups: ["apps.openshift.io"]
+    resources: ["deploymentconfigs"]
+    verbs: ["get", "create", "list", "delete"]
 ---
 apiVersion: apps/v1beta1
 kind: Deployment
@@ -38,8 +65,12 @@ spec:
       serviceAccountName: krb-operator
       containers:
         - name: krb-operator
-          image: alexeyn/krb-operator:latest
+          image: alexeyn/kerberos-operator:0.1
           env:
             - name: KRB5_IMAGE
               value: alexeyn/krb5:latest
+            - name: APP_CONFIG_PATH
+              value: /opt/docker/resources/application.conf
+            - name: K8S_SPECS_DIR
+              value: /opt/docker/resources
           imagePullPolicy: IfNotPresent

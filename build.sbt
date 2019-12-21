@@ -19,6 +19,7 @@ lazy val root = (project in file("."))
       pureConfig,
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
+    dockerRepository := Some("alexeyn")
   )
   .enablePlugins(AshScriptPlugin)
 
