@@ -1,5 +1,7 @@
 # Kerberos Operator
 
+![](https://github.com/novakov-alexey/krb-operator/workflows/Scala%20CI/badge.svg?branch=master)
+
 This operator deployes KDC, Kadmin servers and creates principals and their keytabs as secrets.
 Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
