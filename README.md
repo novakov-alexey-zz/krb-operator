@@ -1,13 +1,20 @@
 # Kerberos Operator
 
-This operator deployes test KDC and Kadmin instances for development environment.
+This operator deployes KDC, Kadmin servers and creates principals and their keytabs as secrets.
+Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
-Use case:
-- Application requires Kerberos authentication
-- Kerberos needs to be deployed fast for development or PoC purposes
+## Operator use cases
+
+Why would use this Operator?
+
+- SPNEGO authentication for web and backend applications
+- Quickstart for your application development having KDC running inside the K8s cluster
+- Principals and keytabs management using K8s CR objects 
+
+## Custom Resource Definition
 
 Below `Kerb` CRD creates:
-- KDC and Kadmin servers running in a single POD
+- KDC and Kadmin servers running as two separate containers running in a single POD
 - Principals and their keytabs based on the principal list 
 
 ```yaml
@@ -29,13 +36,27 @@ spec:
       secret: cluster-keytab-secret
 ```
 
+## Kerb Spec
+
+- `realm` - Kerberos realm where all principals will be created
+- `principals` - array of principals 
+
+Principal properties:
+
+- `name` - principal name without realm in it. Realm will be added automatically using value of `spec.realm` property
+- `password` - enum filed of two values `static` or `random`. Default value is `random`. 
+`static` means the password will be taken from `principals[i].value` property
+- `value` - password itself. It is optional field. Property is used only when `spec.principals[0].password` is set to `static`
+- `keytab` - it is key in the secret object. Secret can have more than one data keys, i.e. more than one keytab files
+- `secret` - K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
+
 ## Kubernetes objects
 
-Above spec will produce the following objects in `test` namespace:
+Above spec will produce the following objects in the metadata.namespace, i.e. `test` namespace:
  
 ### Secret 
 
-Secret with a keytab as data:
+Containing Kerberos keytab as secret data:
 
 ```bash
 kubectl describe secret cluster-keytab-secret  -n test
@@ -51,11 +72,12 @@ Data
 cluster.keytab:  136 bytes
 ```
 
-principals.secret in the spec can be different, so that it will lead to multiple/different secrets.
+Property `principals.secret` in the `Kerb` spec can be different, so that it will lead to multiple/different 
+secrets created by the Kerberos Operator.
 
 ### Service
 
-A Service for KDC, kadmin, kpasswd:  
+A Service for KDC, kadmin, kpasswd with their TCP/UDP ports:  
 
 ```bash
 my-krb   ClusterIP   172.30.37.134  <none>  88/TCP,88/UDP,464/UDP,749/UDP,749/TCP
