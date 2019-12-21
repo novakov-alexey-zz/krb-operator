@@ -47,10 +47,14 @@ spec:
 Principal properties:
 
 -   `name` - principal name without realm in it. Realm will be added automatically using value of `spec.realm` property
+
 -   `password` - enum filed of two values `static` or `random`. Default value is `random`. 
     `static` means the password will be taken from `principals[i].value` property
+
 -   `value` - password itself. It is optional field. Property is used only when `spec.principals[0].password` is set to `static`
+
 -   `keytab` - it is key in the secret object. Secret can have more than one data keys, i.e. more than one keytab files
+
 -   `secret` - K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
 
 ## Kubernetes objects
