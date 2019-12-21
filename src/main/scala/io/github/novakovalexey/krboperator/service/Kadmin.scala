@@ -70,7 +70,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
           }
         }.flatMap {
           case Right(paths) =>
-            logger.info(s"keytab files added: $paths")
+            logger.debug(s"keytab files added: $paths")
             F.pure(KerberosState(podName, paths))
           case Left(e) =>
             F.raiseError(new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $e"))

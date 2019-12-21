@@ -129,7 +129,8 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
       val deleteService = findService(meta).fold(false)(client.services().inNamespace(meta.namespace).delete(_))
       val deleteAdminSecret =
         secret.findAdminSecret(meta).fold(false)(client.secrets().inNamespace(meta.namespace).delete(_))
-      logger.info(s"Found resources to delete? ${deleteDeployment || deleteService || deleteAdminSecret}")
+      val found = if (deleteDeployment || deleteService || deleteAdminSecret) "yes" else "no"
+      logger.info(s"Found resources to delete: $found")
     }.onError {
       case e: Throwable =>
         Sync[F].delay(logger.error("Failed to delete", e))
