@@ -86,7 +86,7 @@ object DeploymentResource {
 class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretService[F], cfg: KrbOperatorCfg)(
   implicit F: Sync[F],
   T: Timer[F],
-  D: DeploymentResource[T]
+  resource: DeploymentResource[T]
 ) extends LazyLogging {
 
   val adminSecretSpec: String = replaceParams(
@@ -95,7 +95,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
   )
 
   private def deploymentSpec(kdcName: String, krbRealm: String) = replaceParams(
-    Paths.get(cfg.k8sSpecsDir, D.deploymentSpecName),
+    Paths.get(cfg.k8sSpecsDir, resource.deploymentSpecName),
     Map(
       KdcServerParam -> kdcName,
       KrbRealmParam -> krbRealm,
@@ -125,7 +125,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
 
   def delete(krb: Krb, meta: Metadata): F[Unit] =
     Sync[F].delay {
-      val deleteDeployment = findDeployment(meta).fold(false)(d => D.delete(client, d))
+      val deleteDeployment = findDeployment(meta).fold(false)(d => resource.delete(client, d))
       val deleteService = findService(meta).fold(false)(client.services().inNamespace(meta.namespace).delete(_))
       val deleteAdminSecret =
         secret.findAdminSecret(meta).fold(false)(client.secrets().inNamespace(meta.namespace).delete(_))
@@ -139,7 +139,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
     val duration = 1.minute
     F.delay(logger.info(s"Going to wait for deployment until ready: $duration")) *>
       waitFor(duration) { () =>
-        findDeployment(metadata).exists(D.isDeploymentReady)
+        findDeployment(metadata).exists(resource.isDeploymentReady)
       }.flatMap { ready =>
         if (ready) {
           F.delay(logger.info(s"deployment is ready: $metadata"))
@@ -171,7 +171,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
   }
 
   def findDeployment(meta: Metadata): Option[T] =
-    D.findDeployment(client, meta)
+    resource.findDeployment(client, meta)
 
   def findService(meta: Metadata): Option[Service] =
     Option(client.services().inNamespace(meta.namespace).withName(meta.name).get())
@@ -188,6 +188,6 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
       val content = deploymentSpec(meta.name, realm)
       logger.debug(s"Creating new deployment for KDC: ${meta.name}")
       val is = new ByteArrayInputStream(content.getBytes)
-      D.createOrReplace(client, is, meta)
+      resource.createOrReplace(client, is, meta)
     }
 }

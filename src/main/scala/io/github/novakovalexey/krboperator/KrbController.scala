@@ -65,29 +65,31 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       }
 
       missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret).toSet)
-      _ <- {
-        logger.info(s"There are ${missingSecrets.size} missing secrets")
-
-        lazy val adminPwd = secret.getAdminPwd(meta)
-        val r = missingSecrets.map(s => (s, krb.principals.filter(_.secret == s))).map {
-          case (secretName, ps) =>
-            for {
-              pwd <- adminPwd
-              state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd, secretName))
-              statuses <- copyKeytabs(meta.namespace, state)
-              _ <- if (statuses.forall(_._2 == true))
-                F.unit
-              else
-                F.raiseError[Unit](
-                  new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
-                )
-              _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
-              _ = logger.info(s"$checkMark Keytab secret $secretName created")
-            } yield ()
-        }
-        r.toList.parSequence
-      }
+      _ <- createSecrets(krb, meta, missingSecrets)
     } yield ()
+  }
+
+  private def createSecrets(krb: Krb, meta: Metadata, missingSecrets: Set[String]) = {
+    logger.info(s"There are ${missingSecrets.size} missing secrets")
+
+    lazy val adminPwd = secret.getAdminPwd(meta)
+    val r = missingSecrets.map(s => (s, krb.principals.filter(_.secret == s))).map {
+      case (secretName, ps) =>
+        for {
+          pwd <- adminPwd
+          state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd, secretName))
+          statuses <- copyKeytabs(meta.namespace, state)
+          _ <- if (statuses.forall(_._2 == true))
+            F.unit
+          else
+            F.raiseError[Unit](
+              new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
+            )
+          _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
+          _ = logger.info(s"$checkMark Keytab secret $secretName created")
+        } yield ()
+    }
+    r.toList.parSequence
   }
 
   private def copyKeytabs(namespace: String, state: KerberosState): F[List[(Path, Boolean)]] =

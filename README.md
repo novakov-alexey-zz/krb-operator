@@ -9,15 +9,16 @@ Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
 Why would use this Operator?
 
-- SPNEGO authentication for web and backend applications
-- Quickstart for your application development having KDC running inside the K8s cluster
-- Principals and keytabs management using K8s CR objects 
+-   SPNEGO authentication for web and backend applications
+-   Quickstart for your application development having KDC running inside the K8s cluster
+-   Principals and keytabs management using K8s CR objects 
 
 ## Custom Resource Definition
 
 Below `Kerb` CRD creates:
-- KDC and Kadmin servers running as two separate containers running in a single POD
-- Principals and their keytabs based on the principal list 
+
+-   KDC and Kadmin servers running as two separate containers running in a single POD
+-   Principals and their keytabs based on the principal list 
 
 ```yaml
 apiVersion: io.github.novakov-alexey/v1
@@ -40,23 +41,23 @@ spec:
 
 ## Kerb Spec
 
-- `realm` - Kerberos realm where all principals will be created
-- `principals` - array of principals 
+-   `realm` - Kerberos realm where all principals will be created
+-   `principals` - array of principals 
 
 Principal properties:
 
-- `name` - principal name without realm in it. Realm will be added automatically using value of `spec.realm` property
-- `password` - enum filed of two values `static` or `random`. Default value is `random`. 
-`static` means the password will be taken from `principals[i].value` property
-- `value` - password itself. It is optional field. Property is used only when `spec.principals[0].password` is set to `static`
-- `keytab` - it is key in the secret object. Secret can have more than one data keys, i.e. more than one keytab files
-- `secret` - K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
+-   `name` - principal name without realm in it. Realm will be added automatically using value of `spec.realm` property
+-   `password` - enum filed of two values `static` or `random`. Default value is `random`. 
+    `static` means the password will be taken from `principals[i].value` property
+-   `value` - password itself. It is optional field. Property is used only when `spec.principals[0].password` is set to `static`
+-   `keytab` - it is key in the secret object. Secret can have more than one data keys, i.e. more than one keytab files
+-   `secret` - K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
 
 ## Kubernetes objects
 
 Above spec will produce the following objects in the metadata.namespace, i.e. `test` namespace:
- 
-### Secret 
+
+### Secret
 
 Containing Kerberos keytab as secret data:
 
