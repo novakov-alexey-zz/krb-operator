@@ -79,12 +79,12 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           pwd <- adminPwd
           state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd, secretName))
           statuses <- copyKeytabs(meta.namespace, state)
-          _ <- if (statuses.forall(_._2 == true))
+          _ <- if (statuses.forall { case (_, copied) => copied })
             F.unit
           else
-            F.raiseError[Unit](
-              new RuntimeException(s"Failed to upload keytabs ${statuses.filter(_._2 == false).map(_._1)} into POD")
-            )
+            F.raiseError[Unit](new RuntimeException(s"Failed to upload keytabs ${statuses.filter {
+              case (_, copied) => !copied
+            }.map { case (path, _) => path }} into POD"))
           _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
           _ = logger.info(s"$checkMark Keytab secret $secretName created")
         } yield ()
