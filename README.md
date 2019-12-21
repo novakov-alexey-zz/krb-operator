@@ -1,6 +1,7 @@
 # Kerberos Operator
 
 ![](https://github.com/novakov-alexey/krb-operator/workflows/Scala%20CI/badge.svg?branch=master)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/a82d2fa75a3d45828c98b11499d8be95)](https://www.codacy.com/manual/novakov.alex/krb-operator?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=novakov-alexey/krb-operator&amp;utm_campaign=Badge_Grade)
 
 This operator deployes KDC, Kadmin servers and creates principals and their keytabs as secrets.
 Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
