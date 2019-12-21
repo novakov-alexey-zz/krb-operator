@@ -151,10 +151,10 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
     def loop(spent: FiniteDuration, maxDuration: FiniteDuration): F[Boolean] =
       F.delay {
         action()
-      }.flatMap { done =>
-        if (!done && spent >= maxDuration) {
+      }.flatMap {
+        case true if spent >= maxDuration =>
           false.pure[F]
-        } else if (!done) {
+        case false =>
           val pause = 500.milliseconds
           F.delay(
             if (spent.toMillis != 0 && spent.toMillis % 5000 == 0)
@@ -162,9 +162,8 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
             else ()
           ) *>
             T.sleep(pause) *> loop(spent + pause, maxDuration)
-        } else {
+        case _ =>
           F.delay(logger.debug(s"Was waiting for ${spent.toMinutes} mins")) *> true.pure[F]
-        }
       }
 
     loop(0.millisecond, maxDuration)
