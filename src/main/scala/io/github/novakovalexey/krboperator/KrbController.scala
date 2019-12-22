@@ -95,7 +95,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
   private def copyKeytabs(namespace: String, state: KerberosState): F[List[(Path, Boolean)]] =
     F.delay(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
       case (acc, keytab) =>
-        logger.debug(s"Copying keytab '$keytab' into $namespace/${state.podName} POD")
+        logger.debug(s"Copying keytab '$keytab' from $namespace/${state.podName} POD")
         acc :+ (keytab.path, client.pods
           .inNamespace(namespace)
           .withName(state.podName)

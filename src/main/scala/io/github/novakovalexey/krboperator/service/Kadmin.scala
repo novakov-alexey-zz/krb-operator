@@ -107,6 +107,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
       createKeytab(context.realm, context.adminPwd, exe, p.name, keytabPath)
     }
 
+    //TODO: it seems like error stream does not contain any errors, if they happened
     val errors = errStream.toByteArray
     if (errors.nonEmpty) {
       val errStr = new String(errors)

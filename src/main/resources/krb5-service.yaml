@@ -25,6 +25,6 @@ spec:
       protocol: TCP
       targetPort: 8749
   selector:
-    deploymentconfig: ${KDC_SERVER}
+    deployment: ${KDC_SERVER}
   sessionAffinity: None
   type: ClusterIP

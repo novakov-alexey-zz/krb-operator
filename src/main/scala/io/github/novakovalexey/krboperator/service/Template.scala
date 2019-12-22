@@ -25,7 +25,8 @@ object Template {
   val KdcServerParam = "KDC_SERVER"
   val KrbRealmParam = "KRB5_REALM"
   val Krb5Image = "KRB5_IMAGE"
-  val DeploymentSelector = "deploymentconfig"
+//  val DeploymentConfigSelector = "deploymentconfig"
+  val DeploymentSelector = "deployment"
 }
 
 trait DeploymentResource[T] {

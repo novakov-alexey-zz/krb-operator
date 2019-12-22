@@ -10,8 +10,8 @@ Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
 Why would use this Operator?
 
--   SPNEGO authentication for web and backend applications
--   Quickstart for your application development having KDC running inside the K8s cluster
+-   Your SPNEGO authentication requires keytab mounted to a POD
+-   Rapid application development having KDC running inside the K8s cluster
 -   Principals and keytabs management using K8s CR objects 
 
 ## Custom Resource Definition
