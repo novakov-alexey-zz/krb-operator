@@ -8,8 +8,10 @@ import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.Metadata
+import io.fabric8.kubernetes.api.model.Status
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
+import io.fabric8.kubernetes.client.utils.Serialization
 import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 import okhttp3.Response
@@ -89,39 +91,66 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     podName: String
   ): Either[String, Path] = {
     val errStream = new ByteArrayOutputStream()
-    val exe = client
-      .pods()
-      .inNamespace(context.meta.namespace)
-      .withName(podName)
-      .inContainer(cfg.kadminContainer)
-      .readingInput(System.in)
-      .writingOutput(System.out)
-      .writingError(errStream)
-      .withTTY()
-      .usingListener(listener)
+    val errChannelStream = new ByteArrayOutputStream()
+
+    val exe =
+      client
+        .pods()
+        .inNamespace(context.meta.namespace)
+        .withName(podName)
+        .inContainer(cfg.kadminContainer)
+        .readingInput(System.in)
+        .writingOutput(System.out)
+        .writingError(errStream)
+        .writingErrorChannel(errChannelStream)
+        .withTTY()
+        .usingListener(listener)
 
     val keytabPath = keytabToPath(prefix, keytab)
-    principals.foreach { p =>
-      runCommand(List("mkdir", new File(keytabPath).getParent), exe)
-      createPrincipal(context.realm, context.adminPwd, exe, p)
-      createKeytab(context.realm, context.adminPwd, exe, p.name, keytabPath)
+
+    val execs = principals.foldLeft(List.empty[ExecWatch]) {
+      case (acc, p) =>
+        acc ++ List(
+          runCommand(List("mkdir", new File(keytabPath).getParent), exe),
+          createPrincipal(context.realm, context.adminPwd, exe, p),
+          createKeytab(context.realm, context.adminPwd, exe, p.name, keytabPath)
+        )
     }
 
-    //TODO: it seems like error stream does not contain any errors, if they happened
-    val errors = errStream.toByteArray
-    if (errors.nonEmpty) {
-      val errStr = new String(errors)
-      logger.error(s"Error occurred: $errStr")
-      Left(errStr)
-    } else {
-      Right(Paths.get(keytabPath))
+    val ec = getExitCode(errChannelStream)
+    closeExecWatchers(execs)
+    val errStreamArr = errStream.toByteArray
+
+    ec match {
+      case Left(e) =>
+        logger.error(s"Got error while creating keytab: $e")
+        Left(e)
+      case _ if errStreamArr.nonEmpty =>
+        val e = new String(errStreamArr)
+        logger.error(s"Got error from error stream while creating keytab: $e")
+        Left(e)
+      case Right(_) => Right(Paths.get(keytabPath))
     }
   }
 
-  private def runCommand(cmd: List[String], exe: Execable[String, ExecWatch]): Unit =
-    Using.resource(exe.exec(cmd: _*)) { _ =>
-      ()
+  private def closeExecWatchers(execs: List[ExecWatch]): Unit = {
+    val closedCount = execs.foldLeft(1) {
+      case (acc, ew) =>
+        Using.resource(ew) { _ =>
+          acc + 1
+        }
     }
+    logger.debug(s"Closed execWatcher(s): $closedCount")
+  }
+
+  private def getExitCode(errChannelStream: ByteArrayOutputStream): Either[String, Int] = {
+    val status = Serialization.unmarshal(errChannelStream.toString, classOf[Status])
+    if (status.getStatus.equals("Success")) Right(0)
+    else Left(status.getMessage)
+  }
+
+  private def runCommand(cmd: List[String], exe: Execable[String, ExecWatch]): ExecWatch =
+    exe.exec(cmd: _*)
 
   private def createKeytab(
     realm: String,
@@ -129,7 +158,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     exe: Execable[String, ExecWatch],
     principal: String,
     keytab: KeytabPath
-  ): Unit = {
+  ) = {
     val keytabCmd = cfg.addKeytabCmd
       .replaceAll("\\$realm", realm)
       .replaceAll("\\$path", keytab)
@@ -138,7 +167,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     runCommand(List("bash", "-c", addKeytab), exe)
   }
 
-  private def createPrincipal(realm: String, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal): Unit = {
+  private def createPrincipal(realm: String, adminPwd: String, exe: Execable[String, ExecWatch], p: Principal) = {
     val addCmd = cfg.addPrincipalCmd
       .replaceAll("\\$realm", realm)
       .replaceAll("\\$username", p.name)

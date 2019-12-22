@@ -102,6 +102,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           .inContainer(operatorCfg.kadminContainer)
           .file(keytab.path.toString)
           .copy(keytab.path))
+        //TODO: remove keytab folder in the Kadmin container
     })
 
   override def onDelete(krb: Krb, meta: Metadata): F[Unit] = {
