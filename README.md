@@ -14,6 +14,22 @@ Why would use this Operator?
 -   Rapid application development having KDC running inside the K8s cluster
 -   Principals and keytabs management using K8s CR objects 
 
+## How to install
+
+### On Kubernetes
+
+```bash
+kubectl create -f manifest/rbac.yaml
+kubectl create -f manifest/kube-deployment.yaml
+```
+
+### On OpenShift
+
+```bash
+oc create -f manifest/rbac.yaml
+oc create -f manifest/openshift-deployment.yaml
+```
+
 ## Custom Resource Definition
 
 Below `Kerb` CRD creates:
