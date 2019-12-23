@@ -77,7 +77,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       case (secretName, ps) =>
         for {
           pwd <- adminPwd
-          state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd, secretName))
+          state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd))
           statuses <- copyKeytabs(meta.namespace, state)
           _ <- if (statuses.forall { case (_, copied) => copied })
             F.unit

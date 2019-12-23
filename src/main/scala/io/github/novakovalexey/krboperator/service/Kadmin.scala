@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters._
 import scala.util.{Random, Using}
 
 final case class KerberosState(podName: String, keytabs: List[KeytabMeta])
-final case class KadminContext(realm: String, meta: Metadata, adminPwd: String, keytabPrefix: String)
+final case class KadminContext(realm: String, meta: Metadata, adminPwd: String)
 final case class KeytabMeta(name: String, path: Path)
 
 object Kadmin {
@@ -55,7 +55,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     }.flatMap {
       case Some(p) =>
         val podName = p.getMetadata.getName
-        F.delay {
+        F.fromEither {
           logger.debug(s"Waiting for POD in ${context.meta.namespace} namespace to be ready")
           //TODO: wait is blocking operation, need to write own wait function
           client.resource(p).inNamespace(context.meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
@@ -64,19 +64,22 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
           val groupedByKeytab = principals.groupBy(_.keytab)
           lazy val uniquePrefix = Random.alphanumeric.take(10).mkString
 
-          //TODO: this should be re-done via cats Validated
-          groupedByKeytab.foldLeft(Either.right[String, List[KeytabMeta]](List.empty)) {
-            case (acc, (keytab, principals)) =>
+          val keytabsOrErrors = groupedByKeytab.toList.map {
+            case (keytab, principals) =>
               addKeytab(context, uniquePrefix, keytab, principals, podName)
-                .flatMap(path => acc.map(_ :+ KeytabMeta(keytab, path)))
-          }
-        }.flatMap {
-          case Right(paths) =>
-            logger.debug(s"keytab files added: $paths")
-            F.pure(KerberosState(podName, paths))
-          case Left(e) =>
-            F.raiseError(new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $e"))
+                .map(KeytabMeta(keytab, _))
+                .toValidatedNec
+          }.sequence
+
+          keytabsOrErrors.toEither.leftMap(e => new RuntimeException(e.toList.mkString(", ")))
+        }.map { paths =>
+          logger.debug(s"keytab files added: $paths")
+          KerberosState(podName, paths)
+        }.adaptErr {
+          case t =>
+            new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $t")
         }
+
       case None =>
         val msg = s"No KDC POD found for ${context.meta}"
         logger.error(msg)
