@@ -111,7 +111,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     val execs = principals.foldLeft(List.empty[ExecWatch]) {
       case (acc, p) =>
         acc ++ List(
-          runCommand(List("mkdir", new File(keytabPath).getParent), exe),
+          createWorkingDir(exe, keytabPath),
           createPrincipal(context.realm, context.adminPwd, exe, p),
           createKeytab(context.realm, context.adminPwd, exe, p.name, keytabPath)
         )
@@ -129,12 +129,16 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
         val e = new String(errStreamArr)
         logger.error(s"Got error from error stream while creating keytab: $e")
         Left(e)
-      case Right(_) => Right(Paths.get(keytabPath))
+      case Right(_) =>
+        Right(Paths.get(keytabPath))
     }
   }
 
+  private def createWorkingDir(exe: Execable[KeytabPath, ExecWatch], keytabPath: String) =
+    runCommand(List("mkdir", new File(keytabPath).getParent), exe)
+
   private def closeExecWatchers(execs: List[ExecWatch]): Unit = {
-    val closedCount = execs.foldLeft(1) {
+    val closedCount = execs.foldLeft(0) {
       case (acc, ew) =>
         Using.resource(ew) { _ =>
           acc + 1
