@@ -87,7 +87,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
   implicit F: Sync[F],
   T: Timer[F],
   resource: DeploymentResource[T]
-) extends LazyLogging {
+) extends LazyLogging with WaitUtils {
 
   val adminSecretSpec: String = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
@@ -139,35 +139,13 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
   def waitForDeployment(metadata: Metadata): F[Unit] = {
     val duration = 1.minute
     F.delay(logger.info(s"Going to wait for deployment until ready: $duration")) *>
-      waitFor(duration) { () =>
+      waitFor(duration) {
         findDeployment(metadata).exists(resource.isDeploymentReady)
       }.flatMap { ready =>
         if (ready) {
           F.delay(logger.info(s"deployment is ready: $metadata"))
         } else F.raiseError(new RuntimeException("Failed to wait for deployment is ready"))
       }
-  }
-
-  private def waitFor(maxDuration: FiniteDuration)(action: () => Boolean): F[Boolean] = {
-    def loop(spent: FiniteDuration, maxDuration: FiniteDuration): F[Boolean] =
-      F.delay {
-        action()
-      }.flatMap {
-        case true if spent >= maxDuration =>
-          false.pure[F]
-        case false =>
-          val pause = 500.milliseconds
-          F.delay(
-            if (spent.toMillis != 0 && spent.toMillis % 5000 == 0)
-              logger.debug(s"Already spent time: ${spent.toSeconds} secs / $maxDuration")
-            else ()
-          ) *>
-            T.sleep(pause) *> loop(spent + pause, maxDuration)
-        case _ =>
-          F.delay(logger.debug(s"Was waiting for ${spent.toMinutes} mins")) *> true.pure[F]
-      }
-
-    loop(0.millisecond, maxDuration)
   }
 
   def findDeployment(meta: Metadata): Option[T] =

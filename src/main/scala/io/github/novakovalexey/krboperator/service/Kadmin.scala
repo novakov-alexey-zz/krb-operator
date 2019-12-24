@@ -2,20 +2,21 @@ package io.github.novakovalexey.krboperator.service
 
 import java.io.{ByteArrayOutputStream, File}
 import java.nio.file.{Path, Paths}
-import java.util.concurrent.TimeUnit
 
-import cats.effect.Sync
+import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.Metadata
-import io.fabric8.kubernetes.api.model.Status
+import io.fabric8.kubernetes.api.model.{Pod, Status}
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
+import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.kubernetes.client.utils.Serialization
 import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
 import okhttp3.Response
 
+import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.{Random, Using}
 
@@ -30,7 +31,9 @@ object Kadmin {
     s"/tmp/$prefix/$name"
 }
 
-class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
+class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F], T: Timer[F])
+    extends LazyLogging
+    with WaitUtils {
   private val listener = new ExecListener {
     override def onOpen(response: Response): Unit =
       logger.debug(s"on open: ${response.body().string()}")
@@ -55,36 +58,42 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     }.flatMap {
       case Some(p) =>
         val podName = p.getMetadata.getName
-        F.fromEither {
-          logger.debug(s"Waiting for POD in ${context.meta.namespace} namespace to be ready")
-          //TODO: wait is blocking operation, need to write own wait function
-          client.resource(p).inNamespace(context.meta.namespace).waitUntilReady(1, TimeUnit.MINUTES)
-          logger.debug(s"POD '$podName' is ready")
+        waitForPod(context.meta.namespace, p) *>
+          F.fromEither {
+            val groupedByKeytab = principals.groupBy(_.keytab)
+            lazy val uniquePrefix = Random.alphanumeric.take(10).mkString
 
-          val groupedByKeytab = principals.groupBy(_.keytab)
-          lazy val uniquePrefix = Random.alphanumeric.take(10).mkString
+            val keytabsOrErrors = groupedByKeytab.toList.map {
+              case (keytab, principals) =>
+                addKeytab(context, uniquePrefix, keytab, principals, podName)
+                  .map(KeytabMeta(keytab, _))
+                  .toValidatedNec
+            }.sequence
 
-          val keytabsOrErrors = groupedByKeytab.toList.map {
-            case (keytab, principals) =>
-              addKeytab(context, uniquePrefix, keytab, principals, podName)
-                .map(KeytabMeta(keytab, _))
-                .toValidatedNec
-          }.sequence
-
-          keytabsOrErrors.toEither.leftMap(e => new RuntimeException(e.toList.mkString(", ")))
-        }.map { paths =>
-          logger.debug(s"keytab files added: $paths")
-          KerberosState(podName, paths)
-        }.adaptErr {
-          case t =>
-            new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $t")
-        }
+            keytabsOrErrors.toEither.leftMap(e => new RuntimeException(e.toList.mkString(", ")))
+          }.map { paths =>
+            logger.debug(s"keytab files added: $paths")
+            KerberosState(podName, paths)
+          }.adaptErr {
+            case t =>
+              new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $t")
+          }
 
       case None =>
         val msg = s"No KDC POD found for ${context.meta}"
         logger.error(msg)
         F.raiseError(new RuntimeException(msg))
     }
+
+  private def waitForPod(namespace: String, p: Pod, duration: FiniteDuration = 1.minute): F[Unit] =
+    F.delay(logger.info(s"Going to wait for POD ${p.getMetadata.getName} until ready: $duration")) *>
+      waitFor(duration) {
+        Readiness.isPodReady(p)
+      }.flatMap { ready =>
+        if (ready) {
+          F.delay(logger.info(s"POD is ready: ${p.getMetadata.getName}"))
+        } else F.raiseError(new RuntimeException("Failed to wait for POD is ready"))
+      }
 
   private def addKeytab(
     context: KadminContext,
