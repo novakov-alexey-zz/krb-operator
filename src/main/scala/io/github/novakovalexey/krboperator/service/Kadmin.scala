@@ -1,7 +1,8 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.io.{ByteArrayOutputStream, File}
+import java.io.ByteArrayOutputStream
 import java.nio.file.{Path, Paths}
+import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.{Sync, Timer}
 import cats.implicits._
@@ -34,18 +35,54 @@ object Kadmin {
 class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F], T: Timer[F])
     extends LazyLogging
     with WaitUtils {
-  private val listener = new ExecListener {
+  private def listener(closed: AtomicBoolean) = new ExecListener {
     override def onOpen(response: Response): Unit =
       logger.debug(s"on open: ${response.body().string()}")
 
     override def onFailure(t: Throwable, response: Response): Unit =
       logger.error(s"Failure on 'pod exec': ${response.body().string()}", t)
 
-    override def onClose(code: Int, reason: String): Unit =
+    override def onClose(code: Int, reason: String): Unit = {
       logger.debug(s"listener closed with code '$code', reason: $reason")
+      closed.getAndSet(true)
+    }
   }
 
   def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): F[KerberosState] =
+    getPod(context).flatMap {
+      case Some(p) =>
+        val podName = p.getMetadata.getName
+        waitForPod(context.meta.namespace, p) *>
+          F.defer {
+            val groupedByKeytab = principals.groupBy(_.keytab)
+            val uniquePrefix = randomString
+
+            val keytabsOrErrors = groupedByKeytab.toList.map {
+              case (keytab, principals) =>
+                val path = keytabToPath(uniquePrefix, keytab)
+                for {
+                  _ <- createWorkingDir(context.meta.namespace, podName, Paths.get(path))
+                  r <- addKeytab(context, path, principals, podName)
+                    .map(KeytabMeta(keytab, _))
+                } yield r
+            }
+
+            keytabsOrErrors.sequence
+          }.map { paths =>
+            logger.debug(s"keytab files added: $paths")
+            KerberosState(podName, paths)
+          }.adaptErr {
+            case t =>
+              new RuntimeException(s"Failed to create keytab(s) via 'kadmin'", t)
+          }
+
+      case None =>
+        val msg = s"No KDC POD found for ${context.meta}"
+        logger.error(msg)
+        F.raiseError(new RuntimeException(msg))
+    }
+
+  private def getPod(context: KadminContext) =
     F.delay {
       client
         .pods()
@@ -55,34 +92,6 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
         .getItems
         .asScala
         .headOption
-    }.flatMap {
-      case Some(p) =>
-        val podName = p.getMetadata.getName
-        waitForPod(context.meta.namespace, p) *>
-          F.fromEither {
-            val groupedByKeytab = principals.groupBy(_.keytab)
-            lazy val uniquePrefix = Random.alphanumeric.take(10).mkString
-
-            val keytabsOrErrors = groupedByKeytab.toList.map {
-              case (keytab, principals) =>
-                addKeytab(context, uniquePrefix, keytab, principals, podName)
-                  .map(KeytabMeta(keytab, _))
-                  .toValidatedNec
-            }.sequence
-
-            keytabsOrErrors.toEither.leftMap(e => new RuntimeException(e.toList.mkString(", ")))
-          }.map { paths =>
-            logger.debug(s"keytab files added: $paths")
-            KerberosState(podName, paths)
-          }.adaptErr {
-            case t =>
-              new RuntimeException(s"Failed to create keytab(s) via 'kadmin', reason: $t")
-          }
-
-      case None =>
-        val msg = s"No KDC POD found for ${context.meta}"
-        logger.error(msg)
-        F.raiseError(new RuntimeException(msg))
     }
 
   private def waitForPod(namespace: String, p: Pod, duration: FiniteDuration = 1.minute): F[Unit] =
@@ -97,59 +106,78 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
 
   private def addKeytab(
     context: KadminContext,
-    prefix: String,
-    keytab: String,
+    keytabPath: KeytabPath,
     principals: List[Principal],
     podName: String
-  ): Either[String, Path] = {
-    val errStream = new ByteArrayOutputStream()
-    val errChannelStream = new ByteArrayOutputStream()
-
-    val exe =
-      client
-        .pods()
-        .inNamespace(context.meta.namespace)
-        .withName(podName)
-        .inContainer(cfg.kadminContainer)
-        .readingInput(System.in)
-        .writingOutput(System.out)
-        .writingError(errStream)
-        .writingErrorChannel(errChannelStream)
-        .withTTY()
-        .usingListener(listener)
-
-    val keytabPath = keytabToPath(prefix, keytab)
-
-    val execs = principals.foldLeft(List.empty[ExecWatch]) {
-      case (acc, p) =>
-        acc ++ List(
-          createWorkingDir(exe, keytabPath),
-          createPrincipal(context.realm, context.adminPwd, exe, p),
-          createKeytab(context.realm, context.adminPwd, exe, p.name, keytabPath)
-        )
-    }
-
-    val ec = getExitCode(errChannelStream)
-    closeExecWatchers(execs)
-    val errStreamArr = errStream.toByteArray
-
-    ec match {
-      case Left(e) =>
-        logger.error(s"Got error while creating keytab: $e")
-        Left(e)
-      case _ if errStreamArr.nonEmpty =>
-        val e = new String(errStreamArr)
-        logger.error(s"Got error from error stream while creating keytab: $e")
-        Left(e)
-      case Right(_) =>
-        Right(Paths.get(keytabPath))
-    }
+  ): F[Path] = {
+    executeInPod(context.meta.namespace, podName) { execable =>
+      principals.foldLeft(List.empty[ExecWatch]) {
+        case (acc, p) =>
+          acc ++ List(
+            createPrincipal(context.realm, context.adminPwd, execable, p),
+            createKeytab(context.realm, context.adminPwd, execable, p.name, keytabPath)
+          )
+      }
+    }.map(_ => Paths.get(keytabPath))
   }
 
-  private def createWorkingDir(exe: Execable[KeytabPath, ExecWatch], keytabPath: String) =
-    runCommand(List("mkdir", new File(keytabPath).getParent), exe)
+  private def createWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =
+    executeInPod(namespace, podName) { execable =>
+      List(runCommand(List("mkdir", keytab.getParent.toString), execable))
+    }
 
-  private def closeExecWatchers(execs: List[ExecWatch]): Unit = {
+  def removeWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =
+    executeInPod(namespace, podName) { execable =>
+      List(runCommand(List("rm", "-r", keytab.getParent.toString), execable))
+    }
+
+  private def executeInPod(namespace: String, podName: String)(
+    commands: Execable[String, ExecWatch] => List[ExecWatch]
+  ): F[Unit] = {
+    for {
+      (exitCode, errStreamArr) <- F.defer {
+        val errStream = new ByteArrayOutputStream()
+        val errChannelStream = new ByteArrayOutputStream()
+        val isClosed = new AtomicBoolean(false)
+        val execable =
+          client
+            .pods()
+            .inNamespace(namespace)
+            .withName(podName)
+            .inContainer(cfg.kadminContainer)
+            .readingInput(System.in)
+            .writingOutput(System.out)
+            .writingError(errStream)
+            .writingErrorChannel(errChannelStream)
+            .withTTY()
+            .usingListener(listener(isClosed))
+
+        val execWatch = commands(execable)
+
+        val maxWait = 60.seconds
+        val closed = waitFor(maxWait)(isClosed.get())
+        closed.flatMap { yes =>
+          if (yes) F.unit
+          else F.raiseError[Unit](new RuntimeException(s"Failed to close POD exec listener within $maxWait"))
+        } *> F.delay {
+          closeExecWatchers(execWatch: _*)
+          val ec = getExitCode(errChannelStream)
+          val errStreamArr = errStream.toByteArray
+          (ec, errStreamArr)
+        }
+      }
+      r <- exitCode match {
+        case Left(e) => F.raiseError[Unit](new RuntimeException(e))
+        case _ if errStreamArr.nonEmpty =>
+          val e = new String(errStreamArr)
+          logger.error(s"Got error from error stream: $e")
+          F.raiseError[Unit](new RuntimeException(e))
+        case _ => F.unit
+      }
+    } yield r
+  }
+
+  private def closeExecWatchers(execs: ExecWatch*): F[Unit] = F.delay {
     val closedCount = execs.foldLeft(0) {
       case (acc, ew) =>
         Using.resource(ew) { _ =>

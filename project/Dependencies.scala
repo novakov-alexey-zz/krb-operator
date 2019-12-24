@@ -13,6 +13,7 @@ object Dependencies extends AutoPlugin {
       val scalaLoggingVersion              = "3.9.2"
       val openshiftClientVersion           = "4.6.4"
       val codecsVersion                    = "1.13"
+      val betterMonadicVersion             = "0.3.1"
       val freyaVersion                     = "0.1.0"
     }
 
@@ -24,6 +25,7 @@ object Dependencies extends AutoPlugin {
     val osClient                 = "io.fabric8"                % "openshift-client"            % openshiftClientVersion
     val pureConfig               = "com.github.pureconfig"     %%  "pureconfig"                % pureConfigVersion
     val codecs                   = "commons-codec"             % "commons-codec"               % codecsVersion
+    val betterMonadicFor         = "com.olegpy"                %% "better-monadic-for"         % betterMonadicVersion
     val freya                    = "io.github.novakov-alexey"  %% "freya"                      % freyaVersion
   }
 }

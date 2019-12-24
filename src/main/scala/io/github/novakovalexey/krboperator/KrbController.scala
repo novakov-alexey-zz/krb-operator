@@ -71,39 +71,54 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
 
   private def createSecrets(krb: Krb, meta: Metadata, missingSecrets: Set[String]) = {
     logger.info(s"There are ${missingSecrets.size} missing secrets")
-
-    lazy val adminPwd = secret.getAdminPwd(meta)
-    val r = missingSecrets.map(s => (s, krb.principals.filter(_.secret == s))).map {
-      case (secretName, ps) =>
-        for {
-          pwd <- adminPwd
-          state <- kadmin.createPrincipalsAndKeytabs(ps, KadminContext(krb.realm, meta, pwd))
-          statuses <- copyKeytabs(meta.namespace, state)
-          _ <- if (statuses.forall { case (_, copied) => copied })
-            F.unit
-          else
-            F.raiseError[Unit](new RuntimeException(s"Failed to upload keytabs ${statuses.filter {
-              case (_, copied) => !copied
-            }.map { case (path, _) => path }} into POD"))
-          _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
-          _ = logger.info(s"$checkMark Keytab secret $secretName created")
-        } yield ()
-    }
-    r.toList.parSequence
+    for {
+      pwd <- secret.getAdminPwd(meta)
+      context = KadminContext(krb.realm, meta, pwd)
+      created <- missingSecrets
+        .map(s => (s, krb.principals.filter(_.secret == s)))
+        .map {
+          case (secretName, principals) =>
+            for {
+              state <- kadmin.createPrincipalsAndKeytabs(principals, context)
+              statuses <- copyKeytabs(meta.namespace, state)
+              _ <- if (statuses.forall { case (_, copied) => copied })
+                F.unit
+              else
+                F.raiseError[Unit](new RuntimeException(s"Failed to upload keytabs ${statuses.filter {
+                  case (_, copied) => !copied
+                }.map { case (path, _) => path }} into POD"))
+              _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
+              _ = logger.info(s"$checkMark Keytab secret $secretName created")
+              _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
+                logger
+                  .error(
+                    s"Failed to delete working directory(s) with keytabs in POD ${meta.namespace}/${state.podName}",
+                    e
+                  )
+              }
+            } yield ()
+        }
+        .toList
+        .parSequence
+    } yield created
   }
 
   private def copyKeytabs(namespace: String, state: KerberosState): F[List[(Path, Boolean)]] =
     F.delay(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
       case (acc, keytab) =>
-        logger.debug(s"Copying keytab '$keytab' from $namespace/${state.podName} POD")
+        logger.debug(s"Copying keytab '${keytab.path}' from $namespace/${state.podName} POD")
         acc :+ (keytab.path, client.pods
           .inNamespace(namespace)
           .withName(state.podName)
           .inContainer(operatorCfg.kadminContainer)
           .file(keytab.path.toString)
           .copy(keytab.path))
-        //TODO: remove keytab folder in the Kadmin container
     })
+
+  private def removeWorkingDirs(namespace: String, state: KerberosState): F[Unit] =
+      state.keytabs.map { keytab =>
+        kadmin.removeWorkingDir(namespace, state.podName, keytab.path)
+      }.sequence.void
 
   override def onDelete(krb: Krb, meta: Metadata): F[Unit] = {
     logger.info(s"delete event: $krb, $meta")

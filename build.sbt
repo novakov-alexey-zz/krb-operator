@@ -10,6 +10,7 @@ resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/
 
 lazy val root = (project in file("."))
   .settings(
+    addCompilerPlugin(betterMonadicFor),
     libraryDependencies ++= Seq(
       freya,
       codecs,
