@@ -8,11 +8,14 @@ Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
 ## Operator use cases
 
-Why would use this Operator?
+Why to use this Operator?
 
--   Your [SPNEGO](https://en.wikipedia.org/wiki/SPNEGO) authentication requires keytab mounted to a POD
--   Rapid application development having KDC running inside the K8s cluster
--   Principals and keytabs management using K8s custom resources 
+-   Your [SPNEGO](https://en.wikipedia.org/wiki/SPNEGO) authentication requires keytab mounted to a POD: 
+    deploy the operator with required principals to get automatically created secrets with keytabs inside
+-   Rapid application development having KDC running inside the K8s cluster: deploy the operator and use 
+automatically created service to call KDC or Kadmin servers
+-   Principals and keytabs management using K8s custom resources: deploy the operator using Kerb resource
+    with required list of principals and their predefined or random passwords 
 
 ## How to install
 
@@ -74,8 +77,6 @@ Principal properties:
     
     Missing password property or default value is `random`.     
 
--   `value` - password itself. It is optional field. Property is used only when `spec.principals[0].password` is set to `static`
-
 -   `keytab` - it is key in the secret object. Secret can have more than one data keys, i.e. more than one keytab files
 
 -   `secret` - K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
@@ -129,4 +130,30 @@ POD is deployed as part of Deployment:
 ```bash
 NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/my-krb   1/1     1            1           26s
+```
+
+
+## Create or Update resource
+
+Examples:
+
+```bash
+kubectl create -f examples/my-krb5.yaml
+# or
+kubectl apply -f examples/my-krb5.yaml
+```
+
+Create or Update resource events are handled in the same way and will create:
+- Deployment, Service, POD, if some of them is missing
+- Kerberos principal, if its `spec.principals[i].secret` is missing. 
+  Changes in values other than `secret` are ignored (current limitation). In order to add new principal to the 
+  `spec.principals` either put new/not-existing `secret` name and desired new principal name. Otherwise, delete Krb resource and create new one with 
+  the desired `principals`.   
+
+## Delete resource
+
+Delete events deletes all objects created by create or apply events: Deployment, Service, POD and Secrets(s)
+
+```bash
+kubectl delete -f examples/my-krb5.yaml
 ```

@@ -30,7 +30,15 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
 
   override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
     logger.info(s"add event: $krb, $meta")
+    onApply(krb, meta)
+  }
 
+  override def onModify(krb: Krb, meta: Metadata): F[Unit] = {
+    logger.info(s"add event: $krb, $meta")
+    onApply(krb, meta)
+  }
+
+  private def onApply(krb: Krb, meta: Metadata) = {
     for {
       _ <- template.findService(meta) match {
         case Some(_) =>
@@ -65,46 +73,51 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       }
 
       missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret).toSet)
-      created <- createSecrets(krb, meta, missingSecrets)
+      created <- missingSecrets.toList match {
+        case Nil =>
+          F.delay(logger.info(s"There are no missing secrets")) *> F.pure(List.empty[Unit])
+        case _ =>
+          F.delay(logger.info(s"There are ${missingSecrets.size} missing secrets")) *> createSecrets(
+            krb,
+            meta,
+            missingSecrets
+          )
+      }
       _ <- F.whenA(created.nonEmpty)(F.delay(logger.info(s"${created.length} secrets created")))
     } yield ()
   }
 
-  private def createSecrets(krb: Krb, meta: Metadata, missingSecrets: Set[String]) = {
-    logger.info(s"There are ${missingSecrets.size} missing secrets")
-    if (missingSecrets.nonEmpty)
-      for {
-        pwd <- secret.getAdminPwd(meta)
-        context = KadminContext(krb.realm, meta, pwd)
-        created <- missingSecrets
-          .map(s => (s, krb.principals.filter(_.secret == s)))
-          .map {
-            case (secretName, principals) =>
-              for {
-                state <- kadmin.createPrincipalsAndKeytabs(principals, context)
-                statuses <- copyKeytabs(meta.namespace, state)
-                _ <- if (statuses.forall { case (_, copied) => copied })
-                  F.unit
-                else
-                  F.raiseError[Unit](new RuntimeException(s"Failed to upload keytabs ${statuses.filter {
-                    case (_, copied) => !copied
-                  }.map { case (path, _) => path }} into POD"))
-                _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
-                _ = logger.info(s"$checkMark Keytab secret $secretName created")
-                _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
-                  logger
-                    .error(
-                      s"Failed to delete working directory(s) with keytabs in POD ${meta.namespace}/${state.podName}",
-                      e
-                    )
-                }
-              } yield ()
-          }
-          .toList
-          .parSequence
-      } yield created
-    else F.pure(List.empty[Unit])
-  }
+  private def createSecrets(krb: Krb, meta: Metadata, missingSecrets: Set[String]) =
+    for {
+      pwd <- secret.getAdminPwd(meta)
+      context = KadminContext(krb.realm, meta, pwd)
+      created <- missingSecrets
+        .map(s => (s, krb.principals.filter(_.secret == s)))
+        .map {
+          case (secretName, principals) =>
+            for {
+              state <- kadmin.createPrincipalsAndKeytabs(principals, context)
+              statuses <- copyKeytabs(meta.namespace, state)
+              _ <- if (statuses.forall { case (_, copied) => copied })
+                F.unit
+              else
+                F.raiseError[Unit](new RuntimeException(s"Failed to upload keytabs ${statuses.filter {
+                  case (_, copied) => !copied
+                }.map { case (path, _) => path }} into POD"))
+              _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
+              _ = logger.info(s"$checkMark Keytab secret $secretName created")
+              _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
+                logger
+                  .error(
+                    s"Failed to delete working directory(s) with keytabs in POD ${meta.namespace}/${state.podName}",
+                    e
+                  )
+              }
+            } yield ()
+        }
+        .toList
+        .parSequence
+    } yield created
 
   private def copyKeytabs(namespace: String, state: KerberosState): F[List[(Path, Boolean)]] =
     F.delay(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
