@@ -1,4 +1,19 @@
 package io.github.novakovalexey.krboperator
 
-final case class Principal(name: String, password: String, value: String, keytab: String, secret: String)
+import com.fasterxml.jackson.annotation.JsonSubTypes.Type
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id
+import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
+import io.github.novakovalexey.krboperator.Password.{Random, Static}
+
+@JsonTypeInfo(use = Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes(
+  Array(new Type(value = classOf[Static], name = "static"), new Type(value = classOf[Random], name = "random"))
+)
+sealed trait Password
+object Password {
+  final case class Static(value: String) extends Password
+  final case class Random() extends Password
+}
+
+final case class Principal(name: String, password: Password, keytab: String, secret: String)
 final case class Krb(realm: String, principals: List[Principal])

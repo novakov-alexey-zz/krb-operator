@@ -47,8 +47,9 @@ spec:
   realm: EXAMPLE.COM
   principals:
     - name: client1
-      password: static
-      value: mypass
+      password:
+        type: static
+        value: mypass
       keytab: cluster.keytab
       secret: cluster-keytab-secret
     - name: user2

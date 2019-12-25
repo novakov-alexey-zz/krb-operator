@@ -14,7 +14,7 @@ import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
 import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.kubernetes.client.utils.Serialization
 import io.github.novakovalexey.krboperator.service.Kadmin._
-import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Principal}
+import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Password, Principal}
 import okhttp3.Response
 
 import scala.concurrent.duration._
@@ -215,13 +215,16 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     val addCmd = cfg.addPrincipalCmd
       .replaceAll("\\$realm", realm)
       .replaceAll("\\$username", p.name)
-      .replaceAll("\\$password", if (isRandomPassword(p.password)) randomString else p.value)
+      .replaceAll("\\$password", getPassword(p.password))
     val addPrincipal = s"echo '$adminPwd' | $addCmd"
     runCommand(List("bash", "-c", addPrincipal), exe)
   }
 
-  private def isRandomPassword(password: String): Boolean =
-    password == null || password == "random"
+  private def getPassword(password: Password): String =
+    password match {
+      case Password.Static(v) => v
+      case _ => randomString
+    }
 
   private def randomString =
     Random.alphanumeric.take(10).mkString
