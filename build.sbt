@@ -1,7 +1,7 @@
 import NativePackagerHelper._
 
 name := "kerberos-operator"
-version := "0.1"
+version := "0.2"
 scalaVersion := "2.13.1"
 ThisBuild / organization := "io.github.novakov-alexey"
 ThisBuild / turbo := true
