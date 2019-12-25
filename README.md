@@ -66,8 +66,13 @@ Principal properties:
 
 -   `name` - principal name without realm in it. Realm will be added automatically using value of `spec.realm` property
 
--   `password` - enum filed of two values `static` or `random`. Default value is `random`. 
-    `static` means the password will be taken from `principals[i].value` property
+-   `password` - a property with two different types. 
+
+    `static`: with password in the value field. 
+    
+    `random`: operator generates random password. it does not require password property in the resource at all.    
+    
+    Missing password property or default value is `random`.     
 
 -   `value` - password itself. It is optional field. Property is used only when `spec.principals[0].password` is set to `static`
 
