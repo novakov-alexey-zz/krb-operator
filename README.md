@@ -10,9 +10,9 @@ Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
 Why would use this Operator?
 
--   Your SPNEGO authentication requires keytab mounted to a POD
+-   Your [SPNEGO](https://en.wikipedia.org/wiki/SPNEGO) authentication requires keytab mounted to a POD
 -   Rapid application development having KDC running inside the K8s cluster
--   Principals and keytabs management using K8s CR objects 
+-   Principals and keytabs management using K8s custom resources 
 
 ## How to install
 
@@ -116,4 +116,11 @@ kubectl get pod my-krb-1-gk52x -n test
 
 NAME             READY   STATUS    RESTARTS   AGE
 my-krb-1-gk52x   2/2     Running   0          24m
+```
+
+POD is deployed as part of Deployment:
+
+```bash
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/my-krb   1/1     1            1           26s
 ```
