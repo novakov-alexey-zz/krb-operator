@@ -145,7 +145,9 @@ kubectl apply -f examples/my-krb5.yaml
 ```
 
 Create or Update resource events are handled in the same way and will create:
+
 -   Deployment, Service, POD, if some of them is missing
+
 -   Kerberos principal, if its `spec.principals[i].secret` is missing. 
     Changes in values other than `secret` are ignored (current limitation). In order to add new principal to the 
     `spec.principals` either put new/not-existing `secret` name and desired new principal name. Otherwise, delete Krb resource and create new one with 
