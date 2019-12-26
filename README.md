@@ -11,10 +11,12 @@ Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 Why to use this Operator?
 
 -   Your [SPNEGO](https://en.wikipedia.org/wiki/SPNEGO) authentication requires keytab mounted to a POD: 
-    deploy the operator with required principals to get automatically created secrets with keytabs inside
--   Rapid application development having KDC running inside the K8s cluster: deploy the operator and use 
+    deploy this operator with required principals to get automatically created secrets with keytabs inside
+    
+-   Rapid application development having KDC running inside the K8s cluster: deploy this operator and use 
 automatically created service to call KDC or Kadmin servers
--   Principals and keytabs management using K8s custom resources: deploy the operator using Kerb resource
+
+-   Principals and keytabs management using K8s custom resources: deploy this operator using Kerb resource
     with required list of principals and their predefined or random passwords 
 
 ## How to install
@@ -132,7 +134,6 @@ NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/my-krb   1/1     1            1           26s
 ```
 
-
 ## Create or Update resource
 
 Examples:
@@ -144,11 +145,11 @@ kubectl apply -f examples/my-krb5.yaml
 ```
 
 Create or Update resource events are handled in the same way and will create:
-- Deployment, Service, POD, if some of them is missing
-- Kerberos principal, if its `spec.principals[i].secret` is missing. 
-  Changes in values other than `secret` are ignored (current limitation). In order to add new principal to the 
-  `spec.principals` either put new/not-existing `secret` name and desired new principal name. Otherwise, delete Krb resource and create new one with 
-  the desired `principals`.   
+-   Deployment, Service, POD, if some of them is missing
+-   Kerberos principal, if its `spec.principals[i].secret` is missing. 
+    Changes in values other than `secret` are ignored (current limitation). In order to add new principal to the 
+    `spec.principals` either put new/not-existing `secret` name and desired new principal name. Otherwise, delete Krb resource and create new one with 
+    the desired `principals`.   
 
 ## Delete resource
 

@@ -1,4 +1,4 @@
-import NativePackagerHelper._
+import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 
 name := "kerberos-operator"
 version := "0.2"
