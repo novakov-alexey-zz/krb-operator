@@ -14,7 +14,7 @@ Why to use this Operator?
     deploy this operator with required principals to get automatically created secrets with keytabs inside
     
 -   Rapid application development having KDC running inside the K8s cluster: deploy this operator and use 
-automatically created service to call KDC or Kadmin servers
+    automatically created service to call KDC or Kadmin servers
 
 -   Principals and keytabs management using K8s custom resources: deploy this operator using Kerb resource
     with required list of principals and their predefined or random passwords 
