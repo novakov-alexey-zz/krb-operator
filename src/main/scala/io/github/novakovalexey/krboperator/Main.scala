@@ -23,6 +23,6 @@ object Main extends IOApp {
           |                              | |                                 
           |                              |_|          
           |""".stripMargin)
-    } *> mod.operator.withRestart(Infinite(maxDelay = 10.seconds))
+    } *> mod.operator.withReconciler(60.seconds).withRestart(Infinite(maxDelay = 10.seconds))
   }
 }

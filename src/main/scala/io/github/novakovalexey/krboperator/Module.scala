@@ -3,7 +3,7 @@ package io.github.novakovalexey.krboperator
 import cats.Parallel
 import cats.effect.{ConcurrentEffect, Sync, Timer}
 import freya.K8sNamespace.AllNamespaces
-import freya.OperatorCfg.Crd
+import freya.Configuration.CrdConfig
 import freya.{Controller, CrdHelper, Operator}
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
@@ -25,11 +25,11 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer] {
 
   val secret = new SecretService[F](client, operatorCfg)
   val kadmin = new Kadmin[F](client, operatorCfg)
-  val cfg = Crd(classOf[Krb], AllNamespaces, "io.github.novakov-alexey")
+  val cfg = CrdConfig(classOf[Krb], AllNamespaces, "io.github.novakov-alexey")
 
   def controller(h: CrdHelper[F, Krb]): Controller[F, Krb] = {
     val template =
-      if (h.isOpenShift.getOrElse(false))
+      if (h.context.isOpenShift.getOrElse(false))
         new Template[F, DeploymentConfig](client, secret, operatorCfg)
       else
         new Template[F, Deployment](client, secret, operatorCfg)

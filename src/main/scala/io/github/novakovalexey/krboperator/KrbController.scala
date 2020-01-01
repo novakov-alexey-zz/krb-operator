@@ -6,7 +6,7 @@ import cats.Parallel
 import cats.effect.{ConcurrentEffect, Sync}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.OperatorCfg.Crd
+import freya.Configuration.CrdConfig
 import freya.{Controller, Metadata}
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
@@ -19,7 +19,7 @@ object KrbController {
 
 class KrbController[F[_]: Parallel: ConcurrentEffect](
   client: OpenShiftClient,
-  cfg: Crd[Krb],
+  cfg: CrdConfig[Krb],
   operatorCfg: KrbOperatorCfg,
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
@@ -29,12 +29,17 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     with LazyLogging {
 
   override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.info(s"add event: $krb, $meta")
+    logger.debug(s"add event: $krb, $meta")
     onApply(krb, meta)
   }
 
   override def onModify(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.info(s"add event: $krb, $meta")
+    logger.debug(s"add event: $krb, $meta")
+    onApply(krb, meta)
+  }
+
+  override def reconcile(krb: Krb, meta: Metadata): F[Unit] = {
+    logger.debug(s"reconcile event: $krb, $meta")
     onApply(krb, meta)
   }
 

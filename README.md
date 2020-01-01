@@ -24,15 +24,15 @@ with required list of principals and their predefined or random passwords
 ### On Kubernetes
 
 ```bash
-kubectl create -f manifest/rbac.yaml
-kubectl create -f manifest/kube-deployment.yaml
+kubectl create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml
+kubectl create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml
 ```
 
 ### On OpenShift
 
 ```bash
-oc create -f manifest/rbac.yaml
-oc create -f manifest/openshift-deployment.yaml
+oc create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml
+oc create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.yaml
 ```
 
 ## Custom Resource Definition
