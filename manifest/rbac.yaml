@@ -39,7 +39,7 @@ rules:
     verbs: ["get", "watch", "list", "create"]
   - apiGroups: ["io.github.novakov-alexey"]
     resources: ["krbs"]
-    verbs: ["watch"]
+    verbs: ["watch", "list"]
   # for OpenShift
   - apiGroups: ["apps.openshift.io"]
     resources: ["deploymentconfigs"]
