@@ -1,7 +1,7 @@
 import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 
 name := "kerberos-operator"
-version := "0.2"
+version := "0.3"
 scalaVersion := "2.13.1"
 ThisBuild / organization := "io.github.novakov-alexey"
 ThisBuild / turbo := true

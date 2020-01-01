@@ -7,7 +7,9 @@ import com.typesafe.scalalogging.StrictLogging
 import pureconfig.error.ConfigReaderFailures
 import pureconfig.generic.ProductHint
 import pureconfig.generic.auto._
-import pureconfig.{loadConfig, CamelCase, ConfigFieldMapping}
+import pureconfig.{CamelCase, ConfigFieldMapping, loadConfig}
+
+import scala.concurrent.duration.FiniteDuration
 
 final case class KrbOperatorCfg(
   krb5Image: String,
@@ -17,7 +19,8 @@ final case class KrbOperatorCfg(
   addKeytabCmd: String,
   kadminContainer: String,
   k8sResourcesPrefix: String,
-  adminPwd: AdminPassword
+  adminPwd: AdminPassword,
+  reconcilerInterval: FiniteDuration
 )
 
 final case class AdminPassword(secretName: String, secretKey: String)
