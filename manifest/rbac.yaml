@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: krb-operator
-  namespace: test
+  namespace: {{NAMESPACE}}
   labels:
     app: krb-operator
 ---
@@ -16,7 +16,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: krb-operator
-    namespace: test
+    namespace: {{NAMESPACE}}
 roleRef:
   kind: ClusterRole
   name: krb-operator
