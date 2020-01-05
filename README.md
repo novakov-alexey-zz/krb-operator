@@ -21,22 +21,32 @@ with required list of principals and their predefined or random passwords
 
 ## How to install
 
+Define namespace as ENV variable:
+
+```bash
+NAMESPACE=<put desired namespace>
+```
+
 ### On Kubernetes
 
 ```bash
-kubectl create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
+ 	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl create -n ${NAMESPACE} -f -
+
 kubectl create \
     -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml \
-    -n <namespace>
+    -n ${NAMESPACE}
 ```
 
 ### On OpenShift
 
 ```bash
-oc create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
+    sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" |  oc create -n ${NAMESPACE} -f -
+
 oc create \
     -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.yaml \
-    -n <namespace>
+    -n ${NAMESPACE}
 ```
 
 ## Custom Resource Definition

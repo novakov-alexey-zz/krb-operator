@@ -30,6 +30,8 @@ object Kadmin {
 
   def keytabToPath(prefix: String, name: String): String =
     s"/tmp/$prefix/$name"
+
+  val ExecInPodTimeout = 60.seconds
 }
 
 class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F], T: Timer[F])
@@ -154,11 +156,10 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
 
         val execWatch = commands(execable)
 
-        val maxWait = 60.seconds
-        val closed = waitFor(maxWait)(isClosed.get())
+        val closed = waitFor(ExecInPodTimeout)(isClosed.get())
         closed.flatMap { yes =>
           if (yes) F.unit
-          else F.raiseError[Unit](new RuntimeException(s"Failed to close POD exec listener within $maxWait"))
+          else F.raiseError[Unit](new RuntimeException(s"Failed to close POD exec listener within $ExecInPodTimeout"))
         } *> F.delay {
           closeExecWatchers(execWatch: _*)
           val ec = getExitCode(errChannelStream)
