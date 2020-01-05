@@ -25,14 +25,18 @@ with required list of principals and their predefined or random passwords
 
 ```bash
 kubectl create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml
-kubectl create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml
+kubectl create \
+    -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml \
+    -n <namespace>
 ```
 
 ### On OpenShift
 
 ```bash
 oc create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml
-oc create -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.yaml
+oc create \
+    -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.yaml \
+    -n <namespace>
 ```
 
 ## Custom Resource Definition
