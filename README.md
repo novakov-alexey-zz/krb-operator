@@ -16,7 +16,7 @@ deploy this operator with required principals to get automatically created secre
 -   Rapid application development having KDC running inside the K8s cluster: deploy this operator and use 
 automatically created service to call KDC or Kadmin servers
 
--   Principals and keytabs management using K8s custom resources: deploy this operator using Kerb resource
+-   Principals and keytabs management using K8s custom resources: deploy this operator using Krb resource
 with required list of principals and their predefined or random passwords 
 
 ## How to install
@@ -51,7 +51,7 @@ oc create \
 
 ## Custom Resource Definition
 
-Below `Kerb` CRD creates:
+Below `Krb` CRD creates:
 
 -   KDC and Kadmin servers running as two separate containers running in a single POD
 -   Principals and their keytabs based on the principal list 
@@ -76,7 +76,7 @@ spec:
       secret: cluster-keytab-secret
 ```
 
-## Kerb Spec
+## Krb Spec
 
 -   `realm` - Kerberos realm where all principals will be created
 -   `principals` - array of principals 
@@ -119,7 +119,7 @@ Data
 cluster.keytab:  136 bytes
 ```
 
-Property `principals.secret` in the `Kerb` spec can be different, so that it will lead to multiple/different 
+Property `principals.secret` in the `Krb` spec can be different, so that it will lead to multiple/different 
 secrets created by the Kerberos Operator.
 
 ### Service
