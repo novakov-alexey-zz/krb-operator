@@ -11,10 +11,10 @@ object Dependencies extends AutoPlugin {
       val logbackClassicVersion            = "1.3.0-alpha4"
       val pureConfigVersion                = "0.11.1"
       val scalaLoggingVersion              = "3.9.2"
-      val openshiftClientVersion           = "4.6.4"
+      val openshiftClientVersion           = "4.7.0"
       val codecsVersion                    = "1.13"
       val betterMonadicVersion             = "0.3.1"
-      val freyaVersion                     = "0.1.2"
+      val freyaVersion                     = "0.1.3"
     }
 
     import DependenciesVersion._
