@@ -13,6 +13,7 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
 import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.kubernetes.client.utils.Serialization
+import io.github.novakovalexey.krboperator.Secret.KeytabAndPassword
 import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Password, Principal, Secret}
 import okhttp3.Response
@@ -120,7 +121,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
         case (watchers, c) =>
           watchers ++ List(
             createPrincipal(context.realm, context.adminPwd, exe, c),
-            createKeytab(context.realm, context.adminPwd, exe, c.username, keytabPath)
+            createKeytab(context.realm, context.adminPwd, exe, c, keytabPath)
           )
       }
     }
@@ -210,19 +211,24 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     realm: String,
     adminPwd: String,
     exe: Execable[String, ExecWatch],
-    principal: String,
+    credentials: Credentials,
     keytab: Path
   ) = {
-    val keytabCmd = cfg.addKeytabCmd
+    val cmd = credentials.secret match {
+      case KeytabAndPassword(_) => cfg.commands.addKeytab.noRandomKey
+      case _ => cfg.commands.addKeytab.randomKey
+    }
+
+    val keytabCmd = cmd
       .replaceAll("\\$realm", realm)
       .replaceAll("\\$path", keytab.toString)
-      .replaceAll("\\$username", principal)
+      .replaceAll("\\$username", credentials.username)
     val addKeytab = s"echo '$adminPwd' | $keytabCmd"
     runCommand(List("bash", "-c", addKeytab), exe)
   }
 
   private def createPrincipal(realm: String, adminPwd: String, exe: Execable[String, ExecWatch], cred: Credentials) = {
-    val addCmd = cfg.addPrincipalCmd
+    val addCmd = cfg.commands.addPrincipal
       .replaceAll("\\$realm", realm)
       .replaceAll("\\$username", cred.username)
       .replaceAll("\\$password", cred.password)

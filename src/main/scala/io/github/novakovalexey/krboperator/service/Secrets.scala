@@ -66,15 +66,13 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
             val bytes = Files.readAllBytes(principals.keytabMeta.path)
             acc.addToData(principals.keytabMeta.name, Base64.getEncoder.encodeToString(bytes))
 
-            val principalsWithPassswords = principals.credentials
-              .filter(
-                c =>
-                  c.secret match {
-                    case KeytabAndPassword(_) => true
-                    case _ => false
-                }
-              )
-            principalsWithPassswords
+            val credentialsWithPassword = principals.credentials
+              .filter(_.secret match {
+                case KeytabAndPassword(_) => true
+                case _ => false
+              })
+
+            credentialsWithPassword
               .foldLeft(builder) {
                 case (acc, c) =>
                   acc.addToData(c.username, Base64.getEncoder.encodeToString(c.password.getBytes()))

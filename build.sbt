@@ -1,4 +1,5 @@
 import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
+import sbtrelease.ReleaseStateTransformations._
 
 name := "kerberos-operator"
 version := "0.4.0-SNAPSHOT"
@@ -25,3 +26,17 @@ lazy val root = (project in file("."))
   .enablePlugins(AshScriptPlugin)
 
 mappings in Universal ++= directory("src/main/resources")
+
+releaseProcess :=
+  Seq[ReleaseStep](
+    checkSnapshotDependencies,
+    inquireVersions,
+    setReleaseVersion,
+    releaseStepCommandAndRemaining("docker:publish"),
+    commitReleaseVersion,
+    tagRelease,
+    inquireVersions,
+    setNextVersion,
+    commitNextVersion,
+    pushChanges
+  )
