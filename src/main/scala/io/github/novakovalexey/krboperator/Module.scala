@@ -2,13 +2,13 @@ package io.github.novakovalexey.krboperator
 
 import cats.Parallel
 import cats.effect.{ConcurrentEffect, Sync, Timer}
-import freya.K8sNamespace.AllNamespaces
 import freya.Configuration.CrdConfig
-import freya.{Controller, CrdHelper, Operator}
+import freya.K8sNamespace.{AllNamespaces, CurrentNamespace, Namespace}
+import freya.{Controller, CrdHelper, K8sNamespace, Operator}
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftConfigBuilder}
-import io.github.novakovalexey.krboperator.service.{Kadmin, SecretService, Template}
+import io.github.novakovalexey.krboperator.service.{Kadmin, Secrets, Template}
 
 class Module[F[_]: ConcurrentEffect: Parallel: Timer] {
   val operatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
@@ -23,9 +23,9 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer] {
       .build()
   )
 
-  val secret = new SecretService[F](client, operatorCfg)
+  val secret = new Secrets[F](client, operatorCfg)
   val kadmin = new Kadmin[F](client, operatorCfg)
-  val cfg = CrdConfig(classOf[Krb], AllNamespaces, "io.github.novakov-alexey")
+  val cfg = CrdConfig(classOf[Krb], NamespaceHelper.getNamespace, "io.github.novakov-alexey")
 
   def controller(h: CrdHelper[F, Krb]): Controller[F, Krb] = {
     val template =
@@ -37,4 +37,18 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer] {
   }
 
   val operator = Operator.ofCrd[F, Krb](cfg, Sync[F].pure(client))(controller)
+}
+
+object NamespaceHelper {
+  val AllNamespacesValue = "ALL"
+
+  def getNamespace: K8sNamespace = {
+    val namespace = sys.env.getOrElse("NAMESPACE", AllNamespacesValue)
+    if (namespace == AllNamespacesValue)
+      AllNamespaces
+    else if (namespace == "CURRENT")
+      CurrentNamespace
+    else
+      Namespace(namespace)
+  }
 }

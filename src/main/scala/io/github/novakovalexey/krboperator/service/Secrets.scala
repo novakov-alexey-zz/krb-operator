@@ -11,15 +11,16 @@ import freya.Metadata
 import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.krboperator.KrbOperatorCfg
-import io.github.novakovalexey.krboperator.service.SecretService._
+import io.github.novakovalexey.krboperator.Secret.KeytabAndPassword
+import io.github.novakovalexey.krboperator.service.Secrets._
 
 import scala.jdk.CollectionConverters._
 
-object SecretService {
+object Secrets {
   val principalSecretLabel: Map[String, String] = Map("app" -> "krb")
 }
 
-class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
+class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
 
   def getAdminPwd(meta: Metadata): F[String] =
     F.delay {
@@ -48,9 +49,10 @@ class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implici
         F.delay(logger.error("Failed to get an admin password", t))
     }
 
-  def createSecret(namespace: String, keytabPath: List[KeytabMeta], secretName: String): F[Unit] =
+  def createSecret(namespace: String, principals: List[PrincipalsWithKey], secretName: String): F[Unit] =
     F.delay {
-      logger.debug(s"Creating secret for [${keytabPath.mkString(",")}] keytabs")
+      val keytabs = principals.map(_.keytabMeta)
+      logger.debug(s"Creating secret for [${keytabs.mkString(",")}] keytabs")
       val builder = new SecretBuilder()
         .withNewMetadata()
         .withName(secretName)
@@ -58,15 +60,28 @@ class SecretService[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implici
         .endMetadata()
         .withType("opaque")
 
-      val secret = keytabPath
+      val secret = principals
         .foldLeft(builder) {
-          case (acc, keytab) =>
-            val bytes = Files.readAllBytes(keytab.path)
-            acc.addToData(keytab.name, Base64.getEncoder.encodeToString(bytes))
+          case (acc, principals) =>
+            val bytes = Files.readAllBytes(principals.keytabMeta.path)
+            acc.addToData(principals.keytabMeta.name, Base64.getEncoder.encodeToString(bytes))
+
+            val principalsWithPassswords = principals.credentials
+              .filter(
+                c =>
+                  c.secret match {
+                    case KeytabAndPassword(_) => true
+                    case _ => false
+                }
+              )
+            principalsWithPassswords
+              .foldLeft(builder) {
+                case (acc, c) =>
+                  acc.addToData(c.username, Base64.getEncoder.encodeToString(c.password.getBytes()))
+              }
         }
         .build()
       client.secrets().inNamespace(namespace).createOrReplace(secret)
-      logger.info(s"Secret $secretName has been created in $namespace")
     }
 
   def deleteSecrets(namespace: String): F[Unit] =

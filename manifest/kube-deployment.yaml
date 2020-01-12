@@ -24,3 +24,5 @@ spec:
               value: /opt/docker/resources/application.conf
             - name: K8S_SPECS_DIR
               value: /opt/docker/resources
+            - name: NAMESPACE
+              value: "ALL"

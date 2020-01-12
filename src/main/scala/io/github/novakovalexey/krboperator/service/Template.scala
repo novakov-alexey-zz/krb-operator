@@ -26,6 +26,8 @@ object Template {
   val KrbRealmParam = "KRB5_REALM"
   val Krb5Image = "KRB5_IMAGE"
   val DeploymentSelector = "deployment"
+
+  val deploymentTimeout: FiniteDuration = 1.minute
 }
 
 trait DeploymentResource[T] {
@@ -83,11 +85,12 @@ object DeploymentResource {
   }
 }
 
-class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretService[F], cfg: KrbOperatorCfg)(
+class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[F], cfg: KrbOperatorCfg)(
   implicit F: Sync[F],
   T: Timer[F],
   resource: DeploymentResource[T]
-) extends LazyLogging with WaitUtils {
+) extends LazyLogging
+    with WaitUtils {
 
   val adminSecretSpec: String = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
@@ -137,10 +140,9 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
     }
 
   def waitForDeployment(metadata: Metadata): F[Unit] = {
-    val duration = 1.minute
-    F.delay(logger.info(s"Going to wait for deployment until ready: $duration")) *>
-      waitFor(duration) {
-        findDeployment(metadata).exists(resource.isDeploymentReady)
+    F.delay(logger.info(s"Going to wait for deployment until ready: $deploymentTimeout")) *>
+      waitFor[F](deploymentTimeout) {
+        F.delay(findDeployment(metadata).exists(resource.isDeploymentReady))
       }.flatMap { ready =>
         if (ready) {
           F.delay(logger.info(s"deployment is ready: $metadata"))
@@ -159,6 +161,12 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: SecretSe
       val is = new ByteArrayInputStream(serviceSpec(meta.name).getBytes())
       val s = client.services().load(is).get()
       client.services().inNamespace(meta.namespace).createOrReplace(s)
+    }.void.recoverWith {
+      case e =>
+        for {
+          missing <- F.delay(findService(meta)).map(_.isEmpty)
+          error <- F.whenA(missing)(F.raiseError(e))
+        } yield error
     }
 
   def createDeployment(meta: Metadata, realm: String): F[Unit] =
