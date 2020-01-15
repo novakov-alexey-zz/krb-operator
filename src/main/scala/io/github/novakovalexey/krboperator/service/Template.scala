@@ -42,25 +42,27 @@ trait DeploymentResource[T] {
   val deploymentSpecName: String
 }
 
+class K8sDeploymentResource extends DeploymentResource[Deployment] {
+  override def delete(client: OpenShiftClient, d: Deployment): Boolean =
+    client.apps().deployments().inNamespace(d.getMetadata.getNamespace).delete(d)
+
+  override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[Deployment] =
+    Option(client.apps().deployments().inNamespace(meta.namespace).withName(meta.name).get())
+
+  override def createOrReplace(client: OpenShiftClient, is: ByteArrayInputStream, meta: Metadata): Deployment = {
+    val dc = client.apps().deployments().load(is)
+    client.apps().deployments().inNamespace(meta.namespace).createOrReplace(dc.get())
+  }
+
+  override val deploymentSpecName: String = "krb5-deployment.yaml"
+
+  override def isDeploymentReady(resource: Deployment): Boolean =
+    Readiness.isDeploymentReady(resource)
+}
+
 object DeploymentResource {
 
-  implicit val k8sDeployment: DeploymentResource[Deployment] = new DeploymentResource[Deployment] {
-    override def delete(client: OpenShiftClient, d: Deployment): Boolean =
-      client.apps().deployments().inNamespace(d.getMetadata.getNamespace).delete(d)
-
-    override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[Deployment] =
-      Option(client.apps().deployments().inNamespace(meta.namespace).withName(meta.name).get())
-
-    override def createOrReplace(client: OpenShiftClient, is: ByteArrayInputStream, meta: Metadata): Deployment = {
-      val dc = client.apps().deployments().load(is)
-      client.apps().deployments().inNamespace(meta.namespace).createOrReplace(dc.get())
-    }
-
-    override val deploymentSpecName: String = "krb5-deployment.yaml"
-
-    override def isDeploymentReady(resource: Deployment): Boolean =
-      Readiness.isDeploymentReady(resource)
-  }
+  implicit val k8sDeployment: DeploymentResource[Deployment] = new K8sDeploymentResource
 
   implicit val openShiftDeployment: DeploymentResource[DeploymentConfig] = new DeploymentResource[DeploymentConfig] {
     override def delete(client: OpenShiftClient, d: DeploymentConfig): Boolean =

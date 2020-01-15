@@ -70,10 +70,14 @@ spec:
         type: static
         value: mypass
       keytab: cluster.keytab
-      secret: cluster-keytab-secret
+      secret:
+        type: Keytab
+        name: cluster-keytab
     - name: user2
       keytab: cluster.keytab
-      secret: cluster-keytab-secret
+      secret:
+        type: KeytabAndPassword
+        name: cluster-keytab
 ```
 
 ## Kerb Spec

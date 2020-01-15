@@ -19,6 +19,8 @@ lazy val root = (project in file("."))
       scalaLogging,
       logbackClassic,
       pureConfig,
+      scalaTest % Test,
+      osServerMock % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
     dockerRepository := Some("alexeyn")

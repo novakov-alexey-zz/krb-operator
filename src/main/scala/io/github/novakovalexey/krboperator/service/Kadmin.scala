@@ -1,26 +1,20 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.io.ByteArrayOutputStream
 import java.nio.file.{Path, Paths}
-import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.Metadata
-import io.fabric8.kubernetes.api.model.{Pod, Status}
+import io.fabric8.kubernetes.api.model.Pod
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
-import io.fabric8.kubernetes.client.internal.readiness.Readiness
-import io.fabric8.kubernetes.client.utils.Serialization
+import io.fabric8.kubernetes.client.dsl.{ExecWatch, Execable}
 import io.github.novakovalexey.krboperator.Secret.KeytabAndPassword
 import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Password, Principal, Secret}
-import okhttp3.Response
 
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.{Random, Using}
+import scala.util.Random
 
 final case class Credentials(username: String, password: String, secret: Secret) {
   override def toString: String = s"Credentials($username, <hidden>)"
@@ -37,21 +31,11 @@ object Kadmin {
   val ExecInPodTimeout: FiniteDuration = 60.seconds
 }
 
-class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F], T: Timer[F])
+class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F], T: Timer[F], pods: PodsAlg[F])
     extends LazyLogging
     with WaitUtils {
-  private def listener(closed: AtomicBoolean) = new ExecListener {
-    override def onOpen(response: Response): Unit =
-      logger.debug(s"on open: ${response.body().string()}")
 
-    override def onFailure(t: Throwable, response: Response): Unit =
-      logger.error(s"Failure on 'pod exec': ${response.body().string()}", t)
-
-    override def onClose(code: Int, reason: String): Unit = {
-      logger.debug(s"listener closed with code '$code', reason: $reason")
-      closed.getAndSet(true)
-    }
-  }
+  private val executeInKadmin = pods.executeInPod(client, cfg.kadminContainer) _
 
   def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): F[KerberosState] =
     (for {
@@ -79,35 +63,17 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
       case t => new RuntimeException(s"Failed to create principal(s) & keytab(s) via 'kadmin'", t)
     }
 
-  private def getPod(context: KadminContext) =
-    client
-      .pods()
-      .inNamespace(context.meta.namespace)
-      .withLabel(Template.DeploymentSelector, context.meta.name)
-      .list()
-      .getItems
-      .asScala
-      .find(p => Option(p.getMetadata.getDeletionTimestamp).isEmpty)
-
   private def waitForPod(context: KadminContext, duration: FiniteDuration = 1.minute): F[Option[Pod]] = {
     val previewPod: Option[Pod] => F[Unit] = pod =>
       pod.fold(F.delay(logger.debug("Pod is not available yet")))(
         p => F.delay(logger.debug(s"Pod ${p.getMetadata.getName} is not ready"))
     )
 
-    for {
-      _ <- F.delay(logger.info(s"Going to wait for Pod in namespace ${context.meta.namespace} until ready: $duration"))
-      (ready, pod) <- waitFor[F, Pod](duration, previewPod) {
-        for {
-          p <- F.delay(getPod(context))
-          ready <- p match {
-            case Some(pod) => F.delay(Readiness.isPodReady(pod))
-            case None => false.pure[F]
-          }
-        } yield (ready, p)
-      }
-      _ <- F.whenA(ready)(F.delay(logger.info(s"POD in namespace ${context.meta.namespace}  is ready ")))
-    } yield pod
+    pods.waitForPod(client)(
+      context.meta,
+      previewPod,
+      F.delay(pods.getPod(client)(context.meta.namespace, Template.DeploymentSelector, context.meta.name))
+    )
   }
 
   private def addKeytab(
@@ -116,7 +82,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     credentials: List[Credentials],
     podName: String
   ): F[Unit] =
-    executeInPod(context.meta.namespace, podName) { exe =>
+    executeInKadmin(context.meta.namespace, podName) { exe =>
       credentials.foldLeft(List.empty[ExecWatch]) {
         case (watchers, c) =>
           watchers ++ List(
@@ -127,82 +93,14 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
     }
 
   private def createWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =
-    executeInPod(namespace, podName) { execable =>
+    executeInKadmin(namespace, podName) { execable =>
       List(runCommand(List("mkdir", keytab.getParent.toString), execable))
     }
 
   def removeWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =
-    executeInPod(namespace, podName) { execable =>
+    executeInKadmin(namespace, podName) { execable =>
       List(runCommand(List("rm", "-r", keytab.getParent.toString), execable))
     }
-
-  private def executeInPod(namespace: String, podName: String)(
-    commands: Execable[String, ExecWatch] => List[ExecWatch]
-  ): F[Unit] = {
-    for {
-      (exitCode, errStreamArr) <- F.defer {
-        val errStream = new ByteArrayOutputStream()
-        val errChannelStream = new ByteArrayOutputStream()
-        val isClosed = new AtomicBoolean(false)
-        val execablePod =
-          client
-            .pods()
-            .inNamespace(namespace)
-            .withName(podName)
-            .inContainer(cfg.kadminContainer)
-            .readingInput(System.in)
-            .writingOutput(System.out)
-            .writingError(errStream)
-            .writingErrorChannel(errChannelStream)
-            .withTTY()
-            .usingListener(listener(isClosed))
-
-        val watchers = commands(execablePod)
-
-        for {
-          _ <- F.delay(logger.debug(s"Waiting for Pod exec listener to be closed for $ExecInPodTimeout"))
-          closed <- waitFor[F](ExecInPodTimeout)(F.delay(isClosed.get()))
-          _ <- F
-            .raiseError[Unit](new RuntimeException(s"Failed to close POD exec listener within $ExecInPodTimeout"))
-            .whenA(!closed)
-          _ <- closeExecWatchers(watchers: _*)
-          r <- F.delay {
-            val ec = getExitCode(errChannelStream)
-            val errStreamArr = errStream.toByteArray
-            (ec, errStreamArr)
-          }
-        } yield r
-      }
-      checked <- checkExitCode(exitCode, errStreamArr)
-    } yield checked
-  }
-
-  private def checkExitCode(exitCode: Either[String, Int], errStreamArr: Array[Byte]): F[Unit] = {
-    exitCode match {
-      case Left(e) => F.raiseError[Unit](new RuntimeException(e))
-      case _ if errStreamArr.nonEmpty =>
-        val e = new String(errStreamArr)
-        logger.error(s"Got error from error stream: $e")
-        F.raiseError[Unit](new RuntimeException(e))
-      case _ => F.unit
-    }
-  }
-
-  private def closeExecWatchers(execs: ExecWatch*): F[Unit] = F.delay {
-    val closedCount = execs.foldLeft(0) {
-      case (acc, ew) =>
-        Using.resource(ew) { _ =>
-          acc + 1
-        }
-    }
-    logger.debug(s"Closed execWatcher(s): $closedCount")
-  }
-
-  private def getExitCode(errChannelStream: ByteArrayOutputStream): Either[String, Int] = {
-    val status = Serialization.unmarshal(errChannelStream.toString, classOf[Status])
-    if (status.getStatus.equals("Success")) Right(0)
-    else Left(status.getMessage)
-  }
 
   private def runCommand(cmd: List[String], execable: Execable[String, ExecWatch]): ExecWatch =
     execable.exec(cmd: _*)

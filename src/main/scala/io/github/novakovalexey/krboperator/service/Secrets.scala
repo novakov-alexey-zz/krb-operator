@@ -33,7 +33,7 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
       )
     }.flatMap {
       case Some(s) =>
-        val pwd = Option(s.getData).flatMap(_.asScala.toMap.get(cfg.adminPwd.secretKey))
+        val pwd = Option(s.getStringData).flatMap(_.asScala.toMap.get(cfg.adminPwd.secretKey))
         pwd match {
           case Some(p) =>
             logger.info(s"Found admin password for $meta")
