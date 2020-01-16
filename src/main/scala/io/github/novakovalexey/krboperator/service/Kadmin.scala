@@ -10,7 +10,6 @@ import io.fabric8.kubernetes.api.model.Pod
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecWatch, Execable}
 import io.github.novakovalexey.krboperator.Secret.KeytabAndPassword
-import io.github.novakovalexey.krboperator.service.Kadmin._
 import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Password, Principal, Secret}
 
 import scala.concurrent.duration._
@@ -25,14 +24,28 @@ final case class KerberosState(podName: String, principals: List[PrincipalsWithK
 final case class KadminContext(realm: String, meta: Metadata, adminPwd: String)
 
 object Kadmin {
-  def keytabToPath(prefix: String, name: String): String =
-    s"/tmp/$prefix/$name"
-
   val ExecInPodTimeout: FiniteDuration = 60.seconds
 }
 
-class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F], T: Timer[F], pods: PodsAlg[F])
-    extends LazyLogging
+trait KeytabPathAlg {
+  def keytabToPath(prefix: String, name: String): String
+}
+
+object KeytabPathAlg {
+  implicit val pathGen: KeytabPathAlg = new KeytabPathGenerator
+}
+
+class KeytabPathGenerator extends KeytabPathAlg {
+  def keytabToPath(prefix: String, name: String): String =
+    s"/tmp/$prefix/$name"
+}
+
+class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
+  implicit F: Sync[F],
+  T: Timer[F],
+  pods: PodsAlg[F],
+  pathGen: KeytabPathAlg
+) extends LazyLogging
     with WaitUtils {
 
   private val executeInKadmin = pods.executeInPod(client, cfg.kadminContainer) _
@@ -47,9 +60,9 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
         val groupedByKeytab = principals.groupBy(_.keytab)
         val keytabsOrErrors = groupedByKeytab.toList.map {
           case (keytab, principals) =>
-            val path = Paths.get(keytabToPath(randomString, keytab))
+            val path = Paths.get(pathGen.keytabToPath(randomString, keytab))
             for {
-              _ <- createWorkingDir(context.meta.namespace, podName, path)
+              _ <- createWorkingDir(context.meta.namespace, podName, path.getParent)
               credentials = principals.map(p => Credentials(p.name, getPassword(p.password), p.secret))
               _ <- addKeytab(context, path, credentials, podName)
             } yield PrincipalsWithKey(credentials, KeytabMeta(keytab, path))
@@ -92,9 +105,9 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sy
       }
     }
 
-  private def createWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =
+  private def createWorkingDir(namespace: String, podName: String, keytabDir: Path): F[Unit] =
     executeInKadmin(namespace, podName) { execable =>
-      List(runCommand(List("mkdir", keytab.getParent.toString), execable))
+      List(runCommand(List("mkdir", keytabDir.toString), execable))
     }
 
   def removeWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =

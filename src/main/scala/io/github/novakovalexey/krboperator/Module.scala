@@ -9,7 +9,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, OpenShiftConfigBuilder}
-import io.github.novakovalexey.krboperator.service.{DeploymentResource, Kadmin, Pods, PodsAlg, Secrets, Template}
+import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
 
 object Module {
   def defaultClient: OpenShiftClient =
@@ -25,7 +25,9 @@ object Module {
     )
 }
 
-class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShiftClient = Module.defaultClient) {
+class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShiftClient = Module.defaultClient)(
+  implicit pathGen: KeytabPathAlg
+) {
   val operatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
   val secret = new Secrets[F](client, operatorCfg)
   val kadmin = new Kadmin[F](client, operatorCfg)
