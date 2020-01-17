@@ -3,10 +3,13 @@ package io.github.novakovalexey.krboperator
 import freya.Metadata
 import io.github.novakovalexey.krboperator.Password.{Random, Static}
 import io.github.novakovalexey.krboperator.Secret.{Keytab, KeytabAndPassword}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 
 object Generators {
   val nonEmptyString: Gen[String] = Gen.nonEmptyListOf[Char](Gen.alphaChar).map(_.mkString)
+  implicit lazy val arbBoolean: Arbitrary[Boolean] = Arbitrary(Gen.oneOf(true, false))
+
+  def arbitrary[T](implicit a: Arbitrary[T]): Gen[T] = a.arbitrary
 
   def krb: Gen[Krb] =
     for {
