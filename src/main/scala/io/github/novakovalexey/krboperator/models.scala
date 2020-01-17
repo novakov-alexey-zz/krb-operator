@@ -21,11 +21,11 @@ object Password {
   Array(new Type(value = classOf[Keytab], name = "Keytab"), new Type(value = classOf[KeytabAndPassword], name = "KeytabAndPassword"))
 )
 sealed trait Secret {
-  val secretName: String
+  val name: String
 }
 object Secret {
-  final case class Keytab(secretName: String) extends Secret
-  final case class KeytabAndPassword(secretName: String) extends Secret
+  final case class Keytab(name: String) extends Secret
+  final case class KeytabAndPassword(name: String) extends Secret
 }
 
 final case class Principal(name: String, password: Password, keytab: String, secret: Secret)

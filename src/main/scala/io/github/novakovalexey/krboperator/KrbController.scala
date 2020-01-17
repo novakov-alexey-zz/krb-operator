@@ -85,7 +85,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           } yield ()
       }
 
-      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret.secretName).toSet)
+      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret.name).toSet)
       created <- missingSecrets.toList match {
         case Nil =>
           F.delay(logger.debug(s"There are no missing secrets")) *> F.pure(List.empty[Unit])
@@ -106,7 +106,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       context = KadminContext(krb.realm, meta, pwd)
       created <- {
         val tasks = missingSecrets
-        .map(s => (s, krb.principals.filter(_.secret.secretName == s)))
+        .map(s => (s, krb.principals.filter(_.secret.name == s)))
         .map {
           case (secretName, principals) =>
             for {
