@@ -46,8 +46,8 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
     controllerFor(template)
   }
 
-  def controllerFor(template: Template[F, _ <: HasMetadata]): KrbController[F] =
-    new KrbController[F](client, cfg, operatorCfg, template, kadmin, secret)
+  def controllerFor(template: Template[F, _ <: HasMetadata], parallelSecret: Boolean = true): KrbController[F] =
+    new KrbController[F](client, cfg, operatorCfg, template, kadmin, secret, parallelSecret)
 
   lazy val operator = Operator.ofCrd[F, Krb](cfg, Sync[F].pure(client))(controller)
 }

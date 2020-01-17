@@ -1,3 +1,4 @@
+import Dependencies.autoImport.{scalaCheck, scalaTestCheck}
 import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 import sbtrelease.ReleaseStateTransformations._
 
@@ -20,6 +21,8 @@ lazy val root = (project in file("."))
       logbackClassic,
       pureConfig,
       scalaTest % Test,
+      scalaCheck % Test,
+      scalaTestCheck % Test,
       osServerMock % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",

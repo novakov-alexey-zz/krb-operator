@@ -16,6 +16,8 @@ object Dependencies extends AutoPlugin {
       val betterMonadicVersion             = "0.3.1"
       val freyaVersion                     = "0.1.3"
       val scalaTestVersion                 = "3.1.0"
+      val scalaTestCheckVersion            = "3.1.0.0-RC2"
+      val scalaCheckVersion                = "1.14.3"
     }
 
     import DependenciesVersion._
@@ -24,8 +26,10 @@ object Dependencies extends AutoPlugin {
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
     val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
+    val scalaCheck               = "org.scalacheck"            %% "scalacheck"                 % scalaCheckVersion
+    val scalaTestCheck           = "org.scalatestplus"         %% "scalatestplus-scalacheck"   % scalaTestCheckVersion
     val osClient                 = "io.fabric8"                % "openshift-client"            % fabric8K8sVersion
-    val osServerMock            = "io.fabric8"                 % "openshift-server-mock"       % fabric8K8sVersion
+    val osServerMock             = "io.fabric8"                % "openshift-server-mock"       % fabric8K8sVersion
     val pureConfig               = "com.github.pureconfig"     %%  "pureconfig"                % pureConfigVersion
     val codecs                   = "commons-codec"             % "commons-codec"               % codecsVersion
     val betterMonadicFor         = "com.olegpy"                %% "better-monadic-for"         % betterMonadicVersion

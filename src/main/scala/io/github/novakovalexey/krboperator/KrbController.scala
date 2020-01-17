@@ -23,7 +23,8 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
   operatorCfg: KrbOperatorCfg,
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
-  secret: Secrets[F]
+  secret: Secrets[F],
+  parallelSecret: Boolean = true
 )(implicit F: Sync[F])
     extends Controller[F, Krb]
     with LazyLogging {
@@ -84,7 +85,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           } yield ()
       }
 
-      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret.name).toSet)
+      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret.secretName).toSet)
       created <- missingSecrets.toList match {
         case Nil =>
           F.delay(logger.debug(s"There are no missing secrets")) *> F.pure(List.empty[Unit])
@@ -103,8 +104,9 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     for {
       pwd <- secret.getAdminPwd(meta)
       context = KadminContext(krb.realm, meta, pwd)
-      created <- missingSecrets
-        .map(s => (s, krb.principals.filter(_.secret.name == s)))
+      created <- {
+        val tasks = missingSecrets
+        .map(s => (s, krb.principals.filter(_.secret.secretName == s)))
         .map {
           case (secretName, principals) =>
             for {
@@ -124,7 +126,8 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
             } yield ()
         }
         .toList
-        .parSequence
+        if (parallelSecret) tasks.parSequence else tasks.sequence
+      }
     } yield created
 
   private def checkStatuses(statuses: List[(Path, Boolean)]) = {
