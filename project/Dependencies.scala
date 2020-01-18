@@ -9,12 +9,15 @@ object Dependencies extends AutoPlugin {
     object DependenciesVersion {
       val catsVersion                      = "2.1.0"
       val logbackClassicVersion            = "1.3.0-alpha4"
-      val pureConfigVersion                = "0.11.1"
+      val pureConfigVersion                = "0.12.2"
       val scalaLoggingVersion              = "3.9.2"
-      val openshiftClientVersion           = "4.6.4"
-      val codecsVersion                    = "1.13"
+      val fabric8K8sVersion                = "4.7.0"
+      val codecsVersion                    = "1.14"
       val betterMonadicVersion             = "0.3.1"
-      val freyaVersion                     = "0.1.2"
+      val freyaVersion                     = "0.1.3"
+      val scalaTestVersion                 = "3.1.0"
+      val scalaTestCheckVersion            = "3.1.0.0-RC2"
+      val scalaCheckVersion                = "1.14.3"
     }
 
     import DependenciesVersion._
@@ -22,7 +25,11 @@ object Dependencies extends AutoPlugin {
     val cats                     = "org.typelevel"             %%  "cats-core"                 % catsVersion
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
-    val osClient                 = "io.fabric8"                % "openshift-client"            % openshiftClientVersion
+    val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
+    val scalaCheck               = "org.scalacheck"            %% "scalacheck"                 % scalaCheckVersion
+    val scalaTestCheck           = "org.scalatestplus"         %% "scalatestplus-scalacheck"   % scalaTestCheckVersion
+    val osClient                 = "io.fabric8"                % "openshift-client"            % fabric8K8sVersion
+    val osServerMock             = "io.fabric8"                % "openshift-server-mock"       % fabric8K8sVersion
     val pureConfig               = "com.github.pureconfig"     %%  "pureconfig"                % pureConfigVersion
     val codecs                   = "commons-codec"             % "commons-codec"               % codecsVersion
     val betterMonadicFor         = "com.olegpy"                %% "better-monadic-for"         % betterMonadicVersion

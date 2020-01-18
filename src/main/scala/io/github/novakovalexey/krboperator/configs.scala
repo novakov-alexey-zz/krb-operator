@@ -15,14 +15,14 @@ final case class KrbOperatorCfg(
   krb5Image: String,
   k8sSpecsDir: String,
   adminPrincipal: String,
-  addPrincipalCmd: String,
-  addKeytabCmd: String,
+  commands: Commands,
   kadminContainer: String,
   k8sResourcesPrefix: String,
   adminPwd: AdminPassword,
   reconcilerInterval: FiniteDuration
 )
-
+final case class KeytabCommand(randomKey: String, noRandomKey: String)
+final case class Commands(addPrincipal: String, addKeytab: KeytabCommand)
 final case class AdminPassword(secretName: String, secretKey: String)
 
 object AppConfig extends StrictLogging {

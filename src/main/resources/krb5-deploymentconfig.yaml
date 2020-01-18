@@ -60,6 +60,13 @@ spec:
           image: ${KRB5_IMAGE}
           imagePullPolicy: Always
           name: kdc
+          readinessProbe:
+            exec:
+              command:
+                - ls
+                - /etc/krb5.conf
+            initialDelaySeconds: 10
+            periodSeconds: 5
           ports:
             - containerPort: 8749
               protocol: TCP

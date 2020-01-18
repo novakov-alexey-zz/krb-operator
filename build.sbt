@@ -1,7 +1,8 @@
+import Dependencies.autoImport.{scalaCheck, scalaTestCheck}
 import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
+import sbtrelease.ReleaseStateTransformations._
 
 name := "kerberos-operator"
-version := "0.3"
 scalaVersion := "2.13.1"
 ThisBuild / organization := "io.github.novakov-alexey"
 ThisBuild / turbo := true
@@ -18,6 +19,10 @@ lazy val root = (project in file("."))
       scalaLogging,
       logbackClassic,
       pureConfig,
+      scalaTest % Test,
+      scalaCheck % Test,
+      scalaTestCheck % Test,
+      osServerMock % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
     dockerRepository := Some("alexeyn")
@@ -25,3 +30,17 @@ lazy val root = (project in file("."))
   .enablePlugins(AshScriptPlugin)
 
 mappings in Universal ++= directory("src/main/resources")
+
+releaseProcess :=
+  Seq[ReleaseStep](
+    checkSnapshotDependencies,
+    inquireVersions,
+    setReleaseVersion,
+    releaseStepCommandAndRemaining("docker:publish"),
+    commitReleaseVersion,
+    tagRelease,
+    inquireVersions,
+    setNextVersion,
+    commitNextVersion,
+    pushChanges
+  )

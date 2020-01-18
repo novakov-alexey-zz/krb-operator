@@ -23,18 +23,19 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
   operatorCfg: KrbOperatorCfg,
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
-  secret: SecretService[F]
+  secret: Secrets[F],
+  parallelSecret: Boolean = true
 )(implicit F: Sync[F])
     extends Controller[F, Krb]
     with LazyLogging {
 
   override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.debug(s"add event: $krb, $meta")
+    logger.info(s"add event: $krb, $meta")
     onApply(krb, meta)
   }
 
   override def onModify(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.debug(s"add event: $krb, $meta")
+    logger.info(s"add event: $krb, $meta")
     onApply(krb, meta)
   }
 
@@ -43,11 +44,18 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     onApply(krb, meta)
   }
 
+  override def onDelete(krb: Krb, meta: Metadata): F[Unit] =
+    for {
+      _ <- F.delay(logger.info(s"delete event: $krb, $meta"))
+      _ <- template.delete(krb, meta)
+      _ <- secret.deleteSecrets(meta.namespace)
+    } yield ()
+
   private def onApply(krb: Krb, meta: Metadata) = {
     for {
       _ <- template.findService(meta) match {
         case Some(_) =>
-          logger.info(s"$checkMark [${meta.name}] Service is found, so skipping its creation")
+          logger.debug(s"$checkMark [${meta.name}] Service is found, so skipping its creation")
           F.unit
         case None =>
           for {
@@ -57,7 +65,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       }
       _ <- secret.findAdminSecret(meta) match {
         case Some(_) =>
-          logger.info(s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation")
+          logger.debug(s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation")
           F.unit
         case None =>
           for {
@@ -67,7 +75,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       }
       _ <- template.findDeployment(meta) match {
         case Some(_) =>
-          logger.info(s"$checkMark [${meta.name}] Deployment is found, so skipping its creation")
+          logger.debug(s"$checkMark [${meta.name}] Deployment is found, so skipping its creation")
           F.unit
         case None =>
           for {
@@ -77,12 +85,12 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           } yield ()
       }
 
-      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret).toSet)
+      missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret.name).toSet)
       created <- missingSecrets.toList match {
         case Nil =>
-          F.delay(logger.info(s"There are no missing secrets")) *> F.pure(List.empty[Unit])
+          F.delay(logger.debug(s"There are no missing secrets")) *> F.pure(List.empty[Unit])
         case _ =>
-          F.delay(logger.info(s"There are ${missingSecrets.size} missing secrets")) *> createSecrets(
+          F.delay(logger.info(s"There are ${missingSecrets.size} missing secrets, name(s): $missingSecrets")) *> createSecrets(
             krb,
             meta,
             missingSecrets
@@ -96,56 +104,59 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     for {
       pwd <- secret.getAdminPwd(meta)
       context = KadminContext(krb.realm, meta, pwd)
-      created <- missingSecrets
-        .map(s => (s, krb.principals.filter(_.secret == s)))
+      created <- {
+        val tasks = missingSecrets
+        .map(s => (s, krb.principals.filter(_.secret.name == s)))
         .map {
           case (secretName, principals) =>
             for {
+              _ <- F.delay(logger.debug(s"Creating secret: $secretName"))
               state <- kadmin.createPrincipalsAndKeytabs(principals, context)
               statuses <- copyKeytabs(meta.namespace, state)
-              _ <- if (statuses.forall { case (_, copied) => copied })
-                F.unit
-              else
-                F.raiseError[Unit](new RuntimeException(s"Failed to upload keytabs ${statuses.filter {
-                  case (_, copied) => !copied
-                }.map { case (path, _) => path }} into POD"))
-              _ <- secret.createSecret(meta.namespace, state.keytabs, secretName)
-              _ = logger.info(s"$checkMark Keytab secret $secretName created")
+              _ <- checkStatuses(statuses)
+              _ <- secret.createSecret(meta.namespace, state.principals, secretName)
+              _ = logger.info(s"$checkMark Keytab secret $secretName created in ${meta.namespace}")
               _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
                 logger
                   .error(
-                    s"Failed to delete working directory(s) with keytabs in POD ${meta.namespace}/${state.podName}",
+                    s"Failed to delete working directory(s) with keytab(s) in POD ${meta.namespace}/${state.podName}",
                     e
                   )
               }
             } yield ()
         }
         .toList
-        .parSequence
+        if (parallelSecret) tasks.parSequence else tasks.sequence
+      }
     } yield created
 
+  private def checkStatuses(statuses: List[(Path, Boolean)]) = {
+    val notAllCopied = !statuses.forall { case (_, copied) => copied }
+    F.whenA(notAllCopied)(F.raiseError[Unit] {
+      val paths = statuses.filter {
+        case (_, copied) => !copied
+      }.map { case (path, _) => path }
+      new RuntimeException(s"Failed to upload keytab(s) $paths into POD")
+    })
+  }
+
   private def copyKeytabs(namespace: String, state: KerberosState): F[List[(Path, Boolean)]] =
-    F.delay(state.keytabs.foldLeft(List.empty[(Path, Boolean)]) {
-      case (acc, keytab) =>
-        logger.debug(s"Copying keytab '${keytab.path}' from $namespace/${state.podName} POD")
-        acc :+ (keytab.path, client.pods
+    F.delay(state.principals.foldLeft(List.empty[(Path, Boolean)]) {
+      case (acc, principals) =>
+        val path = principals.keytabMeta.path
+        logger.debug(s"Copying keytab '$path' from $namespace/${state.podName} POD")
+        val copied = client.pods
           .inNamespace(namespace)
           .withName(state.podName)
           .inContainer(operatorCfg.kadminContainer)
-          .file(keytab.path.toString)
-          .copy(keytab.path))
+          .file(path.toString)
+          .copy(path)
+
+        acc :+ (path, copied)
     })
 
   private def removeWorkingDirs(namespace: String, state: KerberosState): F[Unit] =
-    state.keytabs.map { keytab =>
-      kadmin.removeWorkingDir(namespace, state.podName, keytab.path)
+    state.principals.map { p =>
+      kadmin.removeWorkingDir(namespace, state.podName, p.keytabMeta.path)
     }.sequence.void
-
-  override def onDelete(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.info(s"delete event: $krb, $meta")
-    for {
-      _ <- template.delete(krb, meta)
-      _ <- secret.deleteSecrets(meta.namespace)
-    } yield ()
-  }
 }

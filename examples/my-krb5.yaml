@@ -10,7 +10,11 @@ spec:
         type: static
         value: mypass
       keytab: cluster.keytab
-      secret: cluster-keytab
+      secret:
+        type: Keytab
+        name: cluster-keytab
     - name: user2
       keytab: cluster.keytab
-      secret: cluster-keytab
+      secret:
+        type: KeytabAndPassword
+        name: cluster-keytab

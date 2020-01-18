@@ -70,10 +70,14 @@ spec:
         type: static
         value: mypass
       keytab: cluster.keytab
-      secret: cluster-keytab-secret
+      secret:
+        type: Keytab
+        name: cluster-keytab
     - name: user2
       keytab: cluster.keytab
-      secret: cluster-keytab-secret
+      secret:
+        type: KeytabAndPassword
+        name: cluster-keytab
 ```
 
 ## Krb Spec
@@ -95,7 +99,14 @@ Principal properties:
 
 -   `keytab` - it is key in the secret object. Secret can have more than one data keys, i.e. more than one keytab files
 
--   `secret` - K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
+-   `secret` - a property with two different types. 
+    
+    `Keytab` - create keytab as K8s Secret, `name` is the Secret name.
+    
+    `KeytabAndPassword` - create keytab with separate password entry as K8s Secret, `name` is the Secret name, 
+    `principal[i].name` is a key of a secret for principal password
+     
+     K8s secret name. Every principal in the array can have its own secret name, so that multiple secrets will be created
 
 ## Kubernetes objects
 
@@ -106,8 +117,8 @@ Above spec will produce the following objects in the metadata.namespace, i.e. `t
 Containing Kerberos keytab as secret data:
 
 ```bash
-kubectl describe secret cluster-keytab-secret  -n test
-Name:         cluster-keytab-secret
+kubectl describe secret cluster-keytab  -n test
+Name:         cluster-keytab
 Namespace:    test
 Labels:       app=krb
 Annotations:  <none>
@@ -116,7 +127,8 @@ Type:  opaque
 
 Data
 ====
-cluster.keytab:  136 bytes
+cluster.keytab:  274 bytes
+user2:           10 bytes
 ```
 
 Property `principals.secret` in the `Krb` spec can be different, so that it will lead to multiple/different 

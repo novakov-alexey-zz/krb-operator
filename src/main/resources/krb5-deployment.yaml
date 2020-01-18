@@ -51,6 +51,13 @@ spec:
               value: ${KDC_SERVER}
             - name: KRB5_REALM
               value: ${KRB5_REALM}
+          readinessProbe:
+            exec:
+              command:
+                - ls
+                - /etc/krb5.conf
+            initialDelaySeconds: 10
+            periodSeconds: 5
           ports:
             - containerPort: 8749
               protocol: TCP
