@@ -68,32 +68,23 @@ class KrbTest
         .andReturn(200, new ServiceBuilder().build())
         .always()
 
-      server
-        .expect()
-        .post()
-        .withPath(s"/api/v1/namespaces/${meta.namespace}/secrets")
-        .andReturn(200, new SecretBuilder().build())
-        .always()
+      mockDeployments(server, meta)
+      mockSecrets(server, meta, cfg)
 
-      server
-        .expect()
-        .post()
-        .withPath(s"/apis/extensions/v1beta1/namespaces/${meta.namespace}/deployments")
-        .andReturn(200, new DeploymentBuilder().build())
-        .always()
+      krb.principals.foreach { p =>
+        server
+          .expect()
+          .withPath(
+            s"/api/v1/namespaces/${meta.namespace}/pods/$podName/exec?command=sh&command=-c&command=cat+%2Ftmp%2F$tempDir%2F${p.keytab}%7Cbase64&container=${cfg.kadminContainer}&stdout=true"
+          )
+          .andUpgradeToWebSocket()
+          .open(new OutputStreamMessage(""))
+          .done()
+          .always()
+      }
+    }
 
-      server
-        .expect()
-        .withPath(s"/apis/apps/v1/namespaces/${meta.namespace}/deployments/${meta.name}")
-        .andReturn(404, "")
-        .once()
-
-      server
-        .expect()
-        .withPath(s"/apis/apps/v1/namespaces/${meta.namespace}/deployments/${meta.name}")
-        .andReturn(200, new DeploymentBuilder().build())
-        .always()
-
+    private def mockSecrets(server: OpenShiftServer, meta: Metadata, cfg: KrbOperatorCfg) = {
       server
         .expect()
         .withPath(s"/api/v1/namespaces/${meta.namespace}/secrets?labelSelector=${Utils
@@ -117,17 +108,33 @@ class KrbTest
         )
         .always()
 
-      krb.principals.foreach { p =>
-        server
-          .expect()
-          .withPath(
-            s"/api/v1/namespaces/${meta.namespace}/pods/$podName/exec?command=sh&command=-c&command=cat+%2Ftmp%2F$tempDir%2F${p.keytab}%7Cbase64&container=${cfg.kadminContainer}&stdout=true"
-          )
-          .andUpgradeToWebSocket()
-          .open(new OutputStreamMessage(""))
-          .done()
-          .always()
-      }
+      server
+        .expect()
+        .post()
+        .withPath(s"/api/v1/namespaces/${meta.namespace}/secrets")
+        .andReturn(200, new SecretBuilder().build())
+        .always()
+    }
+
+    private def mockDeployments(server: OpenShiftServer, meta: Metadata) = {
+      server
+        .expect()
+        .post()
+        .withPath(s"/apis/extensions/v1beta1/namespaces/${meta.namespace}/deployments")
+        .andReturn(200, new DeploymentBuilder().build())
+        .always()
+
+      server
+        .expect()
+        .withPath(s"/apis/apps/v1/namespaces/${meta.namespace}/deployments/${meta.name}")
+        .andReturn(404, "")
+        .once()
+
+      server
+        .expect()
+        .withPath(s"/apis/apps/v1/namespaces/${meta.namespace}/deployments/${meta.name}")
+        .andReturn(200, new DeploymentBuilder().build())
+        .always()
     }
 
     def forDelete(server: OpenShiftServer, meta: Metadata, cfg: KrbOperatorCfg): Unit = {
