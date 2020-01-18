@@ -33,14 +33,16 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
       )
     }.flatMap {
       case Some(s) =>
-        val pwd = Option(s.getStringData).flatMap(_.asScala.toMap.get(cfg.adminPwd.secretKey))
+        val pwd = Option(s.getData).flatMap(_.asScala.toMap.get(cfg.adminPwd.secretKey))
         pwd match {
           case Some(p) =>
             logger.info(s"Found admin password for $meta")
             val decoded = Base64.getDecoder.decode(p)
             F.pure(new String(decoded))
           case None =>
-            F.raiseError[String](new RuntimeException("Failed to get an admin password"))
+            F.raiseError[String](
+              new RuntimeException(s"Failed to get an admin password at key: ${cfg.adminPwd.secretKey}")
+            )
         }
       case None =>
         F.raiseError[String](new RuntimeException(s"Failed to find a secret '${cfg.adminPwd.secretName}'"))
