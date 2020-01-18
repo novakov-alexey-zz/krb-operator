@@ -57,11 +57,10 @@ object NamespaceHelper {
 
   def getNamespace: K8sNamespace = {
     val namespace = sys.env.getOrElse("NAMESPACE", AllNamespacesValue)
-    if (namespace == AllNamespacesValue)
-      AllNamespaces
-    else if (namespace == "CURRENT")
-      CurrentNamespace
-    else
-      Namespace(namespace)
+    namespace match {
+      case AllNamespacesValue => AllNamespaces
+      case _ if (namespace == "CURRENT") => CurrentNamespace
+      case _ => Namespace(namespace)
+    }
   }
 }
