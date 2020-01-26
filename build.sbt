@@ -22,7 +22,8 @@ lazy val root = (project in file("."))
       scalaTest % Test,
       scalaCheck % Test,
       scalaTestCheck % Test,
-      osServerMock % Test
+      osServerMock % Test,
+      jacksonJsonSchema % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
     dockerRepository := Some("alexeyn")

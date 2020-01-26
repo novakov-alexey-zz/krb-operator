@@ -31,7 +31,7 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
   val operatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
   val secret = new Secrets[F](client, operatorCfg)
   val kadmin = new Kadmin[F](client, operatorCfg)
-  val cfg = CrdConfig(classOf[Krb], NamespaceHelper.getNamespace, "io.github.novakov-alexey")
+  val cfg = CrdConfig(NamespaceHelper.getNamespace, "io.github.novakov-alexey")
 
   lazy val openShiftTemplate: Template[F, DeploymentConfig] =
     new Template[F, DeploymentConfig](client, secret, operatorCfg)
@@ -39,7 +39,7 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
   def k8sTemplate(implicit resource: DeploymentResource[Deployment]): Template[F, Deployment] =
     new Template[F, Deployment](client, secret, operatorCfg)
 
-  def controller(h: CrdHelper[F, Krb]): Controller[F, Krb] = {
+  def controller(h: CrdHelper[F, Krb, Status]): Controller[F, Krb, Status] = {
     val template: Template[F, _ <: HasMetadata] =
       if (h.context.isOpenShift.getOrElse(false)) openShiftTemplate
       else k8sTemplate
@@ -49,7 +49,7 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
   def controllerFor(template: Template[F, _ <: HasMetadata], parallelSecret: Boolean = true): KrbController[F] =
     new KrbController[F](client, cfg, operatorCfg, template, kadmin, secret, parallelSecret)
 
-  lazy val operator = Operator.ofCrd[F, Krb](cfg, Sync[F].pure(client))(controller)
+  lazy val operator = Operator.ofCrd[F, Krb, Status](cfg, Sync[F].pure(client))(controller)
 }
 
 object NamespaceHelper {

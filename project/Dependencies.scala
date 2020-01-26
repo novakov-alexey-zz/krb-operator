@@ -13,8 +13,9 @@ object Dependencies extends AutoPlugin {
       val scalaLoggingVersion              = "3.9.2"
       val fabric8K8sVersion                = "4.7.0"
       val codecsVersion                    = "1.14"
+      val jacksonJsonSchemaV               = "1.0.36"
       val betterMonadicVersion             = "0.3.1"
-      val freyaVersion                     = "0.1.3"
+      val freyaVersion                     = "0.1.4-SNAPSHOT"
       val scalaTestVersion                 = "3.1.0"
       val scalaTestCheckVersion            = "3.1.0.0-RC2"
       val scalaCheckVersion                = "1.14.3"
@@ -34,5 +35,6 @@ object Dependencies extends AutoPlugin {
     val codecs                   = "commons-codec"             % "commons-codec"               % codecsVersion
     val betterMonadicFor         = "com.olegpy"                %% "better-monadic-for"         % betterMonadicVersion
     val freya                    = "io.github.novakov-alexey"  %% "freya"                      % freyaVersion
+    val jacksonJsonSchema        = "com.kjetland"               %% "mbknor-jackson-jsonschema" % jacksonJsonSchemaV
   }
 }
