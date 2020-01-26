@@ -99,6 +99,9 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       }
       _ <- F.whenA(created.nonEmpty)(F.delay(logger.info(s"${created.length} secrets created")))
     } yield Status(processed = true, created.length, krb.principals.length).some
+  }.handleErrorWith { e =>
+    F.delay(logger.error(s"Failed to handle create/apply event: $krb, $meta", e)) *>
+      F.pure(Some(Status(processed = false, 0, krb.principals.length, e.getMessage)))
   }
 
   private def createSecrets(krb: Krb, meta: Metadata, missingSecrets: Set[String]) =
@@ -107,26 +110,26 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       context = KadminContext(krb.realm, meta, pwd)
       created <- {
         val tasks = missingSecrets
-        .map(s => (s, krb.principals.filter(_.secret.name == s)))
-        .map {
-          case (secretName, principals) =>
-            for {
-              _ <- F.delay(logger.debug(s"Creating secret: $secretName"))
-              state <- kadmin.createPrincipalsAndKeytabs(principals, context)
-              statuses <- copyKeytabs(meta.namespace, state)
-              _ <- checkStatuses(statuses)
-              _ <- secret.createSecret(meta.namespace, state.principals, secretName)
-              _ = logger.info(s"$checkMark Keytab secret $secretName created in ${meta.namespace}")
-              _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
-                logger
-                  .error(
-                    s"Failed to delete working directory(s) with keytab(s) in POD ${meta.namespace}/${state.podName}",
-                    e
-                  )
-              }
-            } yield ()
-        }
-        .toList
+          .map(s => (s, krb.principals.filter(_.secret.name == s)))
+          .map {
+            case (secretName, principals) =>
+              for {
+                _ <- F.delay(logger.debug(s"Creating secret: $secretName"))
+                state <- kadmin.createPrincipalsAndKeytabs(principals, context)
+                statuses <- copyKeytabs(meta.namespace, state)
+                _ <- checkStatuses(statuses)
+                _ <- secret.createSecret(meta.namespace, state.principals, secretName)
+                _ = logger.info(s"$checkMark Keytab secret $secretName created in ${meta.namespace}")
+                _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
+                  logger
+                    .error(
+                      s"Failed to delete working directory(s) with keytab(s) in POD ${meta.namespace}/${state.podName}",
+                      e
+                    )
+                }
+              } yield ()
+          }
+          .toList
         if (parallelSecret) tasks.parSequence else tasks.sequence
       }
     } yield created

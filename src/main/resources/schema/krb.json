@@ -108,17 +108,21 @@
         "processed": {
           "type": "boolean"
         },
-        "lastPrincipalsCount": {
+        "lastPrincipalCount": {
           "type": "integer"
         },
-        "principalCount": {
+        "totalPrincipalCount": {
           "type": "integer"
+        },
+        "error": {
+          "type": "string"
         }
       },
       "required": [
         "processed",
-        "lastPrincipalsCount",
-        "principalCount"
+        "lastPrincipalCount",
+        "totalPrincipalCount",
+        "error"
       ]
     }
   }
