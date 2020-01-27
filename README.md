@@ -30,9 +30,11 @@ NAMESPACE=<put desired namespace>
 ### On Kubernetes
 
 ```bash
+# install RBAC
 wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
  	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl create -n ${NAMESPACE} -f -
 
+# install operator
 kubectl create \
     -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml \
     -n ${NAMESPACE}
@@ -41,12 +43,24 @@ kubectl create \
 ### On OpenShift
 
 ```bash
+# install RBAC
 wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
     sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" |  oc create -n ${NAMESPACE} -f -
 
+# install operator
 oc create \
     -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.yaml \
     -n ${NAMESPACE}
+```
+
+## How to uninstall
+
+```bash
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
+    sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl delete -n ${NAMESPACE} -f -
+	
+kubectl delete -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml -n ${NAMESPACE}
+kubectl delete crd krbs.io.github.novakov-alexey
 ```
 
 ## Custom Resource Definition
