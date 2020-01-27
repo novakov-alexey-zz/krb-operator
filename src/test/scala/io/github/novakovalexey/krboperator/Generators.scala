@@ -42,7 +42,8 @@ object Generators {
       name <- nonEmptyString
       namespace <- nonEmptyString
       version <- nonEmptyString
-    } yield Metadata(name, namespace, version)
+      uid <- nonEmptyString
+    } yield Metadata(name, namespace, version, uid)
 
   def customResource: Gen[CustomResource[Krb, Status]] =
     for {

@@ -15,7 +15,7 @@ object Dependencies extends AutoPlugin {
       val codecsVersion                    = "1.14"
       val jacksonJsonSchemaV               = "1.0.36"
       val betterMonadicVersion             = "0.3.1"
-      val freyaVersion                     = "0.1.4-SNAPSHOT"
+      val freyaVersion                     = "0.1.4"
       val scalaTestVersion                 = "3.1.0"
       val scalaTestCheckVersion            = "3.1.0.0-RC2"
       val scalaCheckVersion                = "1.14.3"

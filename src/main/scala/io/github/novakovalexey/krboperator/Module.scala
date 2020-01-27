@@ -4,7 +4,7 @@ import cats.Parallel
 import cats.effect.{ConcurrentEffect, Sync, Timer}
 import freya.Configuration.CrdConfig
 import freya.K8sNamespace.{AllNamespaces, CurrentNamespace, Namespace}
-import freya.{Controller, CrdHelper, K8sNamespace, Operator}
+import freya._
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
@@ -31,7 +31,11 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
   val operatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
   val secret = new Secrets[F](client, operatorCfg)
   val kadmin = new Kadmin[F](client, operatorCfg)
-  val cfg = CrdConfig(NamespaceHelper.getNamespace, "io.github.novakov-alexey")
+  val cfg = CrdConfig(
+    NamespaceHelper.getNamespace,
+    "io.github.novakov-alexey",
+    additionalPrinterColumns = List(AdditionalPrinterColumn(name = "realm", columnType = "string", jsonPath = "realm"))
+  )
 
   lazy val openShiftTemplate: Template[F, DeploymentConfig] =
     new Template[F, DeploymentConfig](client, secret, operatorCfg)
