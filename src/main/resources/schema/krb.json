@@ -1,0 +1,129 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "$schema": "http://json-schema.org/draft-04/schema#",
+      "title": "Krb",
+      "type": "object",
+      "properties": {
+        "realm": {
+          "type": "string"
+        },
+        "principals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "password": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "static"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "title": "static",
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "random"
+                        ]
+                      }
+                    },
+                    "title": "random",
+                    "required": [
+                      "type"
+                    ]
+                  }
+                ]
+              },
+              "keytab": {
+                "type": "string"
+              },
+              "secret": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "Keytab"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "title": "Keytab",
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "KeytabAndPassword"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "title": "KeytabAndPassword",
+                    "required": [
+                      "type"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "processed": {
+          "type": "boolean"
+        },
+        "lastPrincipalCount": {
+          "type": "integer"
+        },
+        "totalPrincipalCount": {
+          "type": "integer"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "processed",
+        "lastPrincipalCount",
+        "totalPrincipalCount",
+        "error"
+      ]
+    }
+  }
+}

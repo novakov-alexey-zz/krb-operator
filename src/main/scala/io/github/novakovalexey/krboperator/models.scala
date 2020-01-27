@@ -30,3 +30,4 @@ object Secret {
 
 final case class Principal(name: String, password: Password, keytab: String, secret: Secret)
 final case class Krb(realm: String, principals: List[Principal])
+final case class Status(processed: Boolean, lastPrincipalCount: Int, totalPrincipalCount: Int, error: String = "")

@@ -7,6 +7,7 @@ import cats.effect.{ConcurrentEffect, Sync}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.Configuration.CrdConfig
+import freya.models.{CustomResource, NewStatus}
 import freya.{Controller, Metadata}
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
@@ -19,36 +20,36 @@ object KrbController {
 
 class KrbController[F[_]: Parallel: ConcurrentEffect](
   client: OpenShiftClient,
-  cfg: CrdConfig[Krb],
+  cfg: CrdConfig,
   operatorCfg: KrbOperatorCfg,
   template: Template[F, _ <: HasMetadata],
   kadmin: Kadmin[F],
   secret: Secrets[F],
   parallelSecret: Boolean = true
 )(implicit F: Sync[F])
-    extends Controller[F, Krb]
+    extends Controller[F, Krb, Status]
     with LazyLogging {
 
-  override def onAdd(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.info(s"add event: $krb, $meta")
-    onApply(krb, meta)
+  override def onAdd(krb: CustomResource[Krb, Status]): F[NewStatus[Status]] = {
+    logger.info(s"'add' event: ${krb.spec}, ${krb.metadata}")
+    onApply(krb.spec, krb.metadata)
   }
 
-  override def onModify(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.info(s"add event: $krb, $meta")
-    onApply(krb, meta)
+  override def onModify(krb: CustomResource[Krb, Status]): F[NewStatus[Status]] = {
+    logger.info(s"'modify' event: ${krb.spec}, ${krb.metadata}")
+    onApply(krb.spec, krb.metadata)
   }
 
-  override def reconcile(krb: Krb, meta: Metadata): F[Unit] = {
-    logger.debug(s"reconcile event: $krb, $meta")
-    onApply(krb, meta)
+  override def reconcile(krb: CustomResource[Krb, Status]): F[NewStatus[Status]] = {
+    logger.debug(s"reconcile event: ${krb.spec}, ${krb.metadata}")
+    onApply(krb.spec, krb.metadata)
   }
 
-  override def onDelete(krb: Krb, meta: Metadata): F[Unit] =
+  override def onDelete(krb: CustomResource[Krb, Status]): F[Unit] =
     for {
-      _ <- F.delay(logger.info(s"delete event: $krb, $meta"))
-      _ <- template.delete(krb, meta)
-      _ <- secret.deleteSecrets(meta.namespace)
+      _ <- F.delay(logger.info(s"delete event: ${krb.spec}, ${krb.metadata}"))
+      _ <- template.delete(krb.spec, krb.metadata)
+      _ <- secret.deleteSecrets(krb.metadata.namespace)
     } yield ()
 
   private def onApply(krb: Krb, meta: Metadata) = {
@@ -97,7 +98,10 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           )
       }
       _ <- F.whenA(created.nonEmpty)(F.delay(logger.info(s"${created.length} secrets created")))
-    } yield ()
+    } yield Status(processed = true, created.length, krb.principals.length).some
+  }.handleErrorWith { e =>
+    F.delay(logger.error(s"Failed to handle create/apply event: $krb, $meta", e)) *>
+      F.pure(Some(Status(processed = false, 0, krb.principals.length, e.getMessage)))
   }
 
   private def createSecrets(krb: Krb, meta: Metadata, missingSecrets: Set[String]) =
@@ -106,26 +110,26 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
       context = KadminContext(krb.realm, meta, pwd)
       created <- {
         val tasks = missingSecrets
-        .map(s => (s, krb.principals.filter(_.secret.name == s)))
-        .map {
-          case (secretName, principals) =>
-            for {
-              _ <- F.delay(logger.debug(s"Creating secret: $secretName"))
-              state <- kadmin.createPrincipalsAndKeytabs(principals, context)
-              statuses <- copyKeytabs(meta.namespace, state)
-              _ <- checkStatuses(statuses)
-              _ <- secret.createSecret(meta.namespace, state.principals, secretName)
-              _ = logger.info(s"$checkMark Keytab secret $secretName created in ${meta.namespace}")
-              _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
-                logger
-                  .error(
-                    s"Failed to delete working directory(s) with keytab(s) in POD ${meta.namespace}/${state.podName}",
-                    e
-                  )
-              }
-            } yield ()
-        }
-        .toList
+          .map(s => (s, krb.principals.filter(_.secret.name == s)))
+          .map {
+            case (secretName, principals) =>
+              for {
+                _ <- F.delay(logger.debug(s"Creating secret: $secretName"))
+                state <- kadmin.createPrincipalsAndKeytabs(principals, context)
+                statuses <- copyKeytabs(meta.namespace, state)
+                _ <- checkStatuses(statuses)
+                _ <- secret.createSecret(meta.namespace, state.principals, secretName)
+                _ = logger.info(s"$checkMark Keytab secret $secretName created in ${meta.namespace}")
+                _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
+                  logger
+                    .error(
+                      s"Failed to delete working directory(s) with keytab(s) in POD ${meta.namespace}/${state.podName}",
+                      e
+                    )
+                }
+              } yield ()
+          }
+          .toList
         if (parallelSecret) tasks.parSequence else tasks.sequence
       }
     } yield created

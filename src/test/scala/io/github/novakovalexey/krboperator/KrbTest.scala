@@ -191,16 +191,16 @@ class KrbTest
   }
 
   property("create Kerberos and principals") {
-    forAll(Generators.krb, Generators.meta, arbitrary[Boolean]) { (krb, meta, isAdd) =>
+    forAll(Generators.customResource, arbitrary[Boolean]) { (cr, isAdd) =>
       //given
       val server = startServer
-      val mod = createModule(meta, server)
+      val mod = createModule(cr.metadata, server)
 
-      expectations.forApply(server, meta, testPod, mod.operatorCfg, krb, tempDir)
+      expectations.forApply(server, cr.metadata, testPod, mod.operatorCfg, cr.spec, tempDir)
       val controller = createController(mod)
 
       // when
-      val res = if (isAdd) controller.onAdd(krb, meta) else controller.onModify(krb, meta)
+      val res = if (isAdd) controller.onAdd(cr) else controller.onModify(cr)
       //then
       res.unsafeRunSync()
 
@@ -209,16 +209,16 @@ class KrbTest
   }
 
   property("delete Kerberos and principals") {
-    forAll(Generators.krb, Generators.meta, arbitrary[Boolean]) { (krb, meta, isAdd) =>
+    forAll(Generators.customResource, arbitrary[Boolean]) { (cr, isAdd) =>
       //given
       val server = startServer
-      val mod = createModule(meta, server)
+      val mod = createModule(cr.metadata, server)
 
-      expectations.forDelete(server, meta, mod.operatorCfg)
+      expectations.forDelete(server, cr.metadata, mod.operatorCfg)
       val controller = createController(mod)
 
       // when
-      val res = controller.onDelete(krb, meta)
+      val res = controller.onDelete(cr)
       //then
       res.unsafeRunSync()
 
