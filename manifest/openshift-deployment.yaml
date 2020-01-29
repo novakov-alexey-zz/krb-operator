@@ -18,7 +18,7 @@ spec:
       serviceAccountName: krb-operator
       containers:
         - name: krb-operator
-          image: alexeyn/kerberos-operator:0.4.1
+          image: alexeyn/kerberos-operator:0.4.2
           imagePullPolicy: Always
           env:
             - name: KRB5_IMAGE
