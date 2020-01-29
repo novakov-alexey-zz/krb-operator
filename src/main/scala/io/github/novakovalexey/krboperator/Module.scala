@@ -34,7 +34,10 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
   val cfg = CrdConfig(
     NamespaceHelper.getNamespace,
     "io.github.novakov-alexey",
-    additionalPrinterColumns = List(AdditionalPrinterColumn(name = "realm", columnType = "string", jsonPath = "realm"))
+    additionalPrinterColumns = List(
+      AdditionalPrinterColumn(name = "Realm", columnType = "string", jsonPath = ".spec.realm"),
+      AdditionalPrinterColumn(name = "Age", columnType = "date", jsonPath = ".metadata.creationTimestamp")
+    )
   )
 
   lazy val openShiftTemplate: Template[F, DeploymentConfig] =
