@@ -38,8 +38,8 @@ rules:
     resources: ["customresourcedefinitions"]
     verbs: ["get", "watch", "list", "create"]
   - apiGroups: ["io.github.novakov-alexey"]
-    resources: ["krbs"]
-    verbs: ["watch", "list"]
+    resources: ["krbs", "krbs/status"]
+    verbs: ["watch", "list", "update"]
   # for OpenShift
   - apiGroups: ["apps.openshift.io"]
     resources: ["deploymentconfigs"]
