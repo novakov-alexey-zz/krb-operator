@@ -26,7 +26,8 @@ lazy val root = (project in file("."))
       jacksonJsonSchema % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
-    dockerRepository := Some("alexeyn")
+    dockerRepository := Some("alexeyn"),
+    javaOptions in Universal ++= Seq("-Dlogback.configurationFile=/opt/conf/logback.xml"),
   )
   .enablePlugins(AshScriptPlugin)
 

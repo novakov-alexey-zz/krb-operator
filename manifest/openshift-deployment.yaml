@@ -20,6 +20,10 @@ spec:
         - name: krb-operator
           image: alexeyn/kerberos-operator:0.4.2
           imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /opt/conf/logback.xml
+              subPath: logback.xml
+              name: logback-xml
           env:
             - name: KRB5_IMAGE
               value: alexeyn/krb5:latest
@@ -29,3 +33,39 @@ spec:
               value: /opt/docker/resources
             - name: NAMESPACE
               value: "ALL"
+      volumes:
+        - configMap:
+            defaultMode: 0777
+            name: krb-logback
+          name: logback-xml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: krb-logback
+data:
+  logback.xml: |+
+    <configuration scan="true" scanPeriod="60 seconds">
+
+        <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+            <resetJUL>true</resetJUL>
+        </contextListener>
+
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <withJansi>true</withJansi>
+            <encoder>
+                <pattern>%highlight(%date{yyyy-MM-dd HH:mm:ss.SSSZ, UTC}) [%thread] %highlight(%-5level) %cyan(%logger{15}) - %msg %n</pattern>
+            </encoder>
+        </appender>
+
+        <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+            <appender-ref ref="STDOUT"/>
+        </appender>
+
+        <logger name="io.fabric8.kubernetes.client" level="ERROR" />
+        <logger name="io.fabric8.kubernetes.client.internal" level="ERROR" />
+
+        <root level="INFO">
+            <appender-ref ref="ASYNCSTDOUT"/>
+        </root>
+    </configuration>
