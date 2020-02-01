@@ -1,4 +1,3 @@
-import Dependencies.autoImport.{scalaCheck, scalaTestCheck}
 import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 import sbtrelease.ReleaseStateTransformations._
 
@@ -32,6 +31,9 @@ lazy val root = (project in file("."))
   .enablePlugins(AshScriptPlugin)
 
 mappings in Universal ++= directory("src/main/resources")
+
+Revolver.enableDebugging(port = 5050, suspend = true)
+envVars in reStart := Map("NAMESPACE" -> "test")
 
 releaseProcess :=
   Seq[ReleaseStep](
