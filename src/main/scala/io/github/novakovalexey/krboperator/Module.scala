@@ -5,11 +5,13 @@ import cats.effect.{ConcurrentEffect, Sync, Timer}
 import freya.Configuration.CrdConfig
 import freya.K8sNamespace.{AllNamespaces, CurrentNamespace, Namespace}
 import freya._
+import freya.json.circe._
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, OpenShiftConfigBuilder}
 import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
+import io.circe.generic.extras.auto._
 
 object Module {
   def defaultClient: OpenShiftClient =
@@ -27,11 +29,11 @@ object Module {
 
 class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShiftClient = Module.defaultClient)(
   implicit pathGen: KeytabPathAlg
-) {
-  val operatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
+) extends Codecs {
+  val operatorCfg: KrbOperatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
   val secret = new Secrets[F](client, operatorCfg)
   val kadmin = new Kadmin[F](client, operatorCfg)
-  val cfg = CrdConfig(
+  val cfg: CrdConfig = CrdConfig(
     NamespaceHelper.getNamespace,
     "io.github.novakov-alexey",
     additionalPrinterColumns = List(

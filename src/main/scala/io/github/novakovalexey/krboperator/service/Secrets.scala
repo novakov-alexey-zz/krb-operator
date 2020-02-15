@@ -10,8 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import freya.Metadata
 import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
-import io.github.novakovalexey.krboperator.KrbOperatorCfg
-import io.github.novakovalexey.krboperator.Secret.KeytabAndPassword
+import io.github.novakovalexey.krboperator.{KeytabAndPassword, KrbOperatorCfg}
 import io.github.novakovalexey.krboperator.service.Secrets._
 
 import scala.jdk.CollectionConverters._

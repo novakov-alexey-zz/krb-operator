@@ -9,8 +9,7 @@ import freya.Metadata
 import io.fabric8.kubernetes.api.model.Pod
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecWatch, Execable}
-import io.github.novakovalexey.krboperator.Secret.KeytabAndPassword
-import io.github.novakovalexey.krboperator.{KrbOperatorCfg, Password, Principal, Secret}
+import io.github.novakovalexey.krboperator.{KeytabAndPassword, KrbOperatorCfg, Password, Principal, Secret, Static}
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -149,7 +148,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
 
   private def getPassword(password: Password): String =
     password match {
-      case Password.Static(v) => v
+      case Static(v) => v
       case _ => randomString
     }
 

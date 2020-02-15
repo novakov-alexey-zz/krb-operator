@@ -7,15 +7,18 @@ object Dependencies extends AutoPlugin {
   object autoImport {
 
     object DependenciesVersion {
-      val catsVersion                      = "2.1.0"
+      val catsVersion                      = "2.1.1"
+      val circeVersion                     = "0.13.0"
+      val circeExtrasVersion               = "0.12.2"
       val logbackClassicVersion            = "1.3.0-alpha4"
       val pureConfigVersion                = "0.12.2"
       val scalaLoggingVersion              = "3.9.2"
-      val fabric8K8sVersion                = "4.7.1"
+      val fabric8K8sVersion                = "4.8.0"
       val codecsVersion                    = "1.14"
       val jacksonJsonSchemaV               = "1.0.36"
+      val jacksonScalaVersion              = "2.10.2"
       val betterMonadicVersion             = "0.3.1"
-      val freyaVersion                     = "0.1.4"
+      val freyaVersion                     = "0.1.5-SNAPSHOT"
       val scalaTestVersion                 = "3.1.0"
       val scalaTestCheckVersion            = "3.1.0.0-RC2"
       val scalaCheckVersion                = "1.14.3"
@@ -34,7 +37,12 @@ object Dependencies extends AutoPlugin {
     val pureConfig               = "com.github.pureconfig"     %%  "pureconfig"                % pureConfigVersion
     val codecs                   = "commons-codec"             % "commons-codec"               % codecsVersion
     val betterMonadicFor         = "com.olegpy"                %% "better-monadic-for"         % betterMonadicVersion
-    val freya                    = "io.github.novakov-alexey"  %% "freya"                      % freyaVersion
+    val freya                    = "io.github.novakov-alexey"  %% "freya-core"                 % freyaVersion
+    val freyaCirce               = "io.github.novakov-alexey"  %% "freya-circe"                % freyaVersion
+    val circeCore                = "io.circe"                  %% "circe-core"                 % circeVersion
+    val circeGeneric             = "io.circe"                  %% "circe-generic"              % circeVersion
+    val circeExtra               = "io.circe"                  %% "circe-generic-extras"       % circeExtrasVersion
     val jacksonJsonSchema        = "com.kjetland"               %% "mbknor-jackson-jsonschema" % jacksonJsonSchemaV
+    val jacksonScala             = "com.fasterxml.jackson.module" %% "jackson-module-scala"    % jacksonScalaVersion
   }
 }

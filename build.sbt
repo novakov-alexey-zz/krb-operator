@@ -5,6 +5,7 @@ name := "kerberos-operator"
 scalaVersion := "2.13.1"
 ThisBuild / organization := "io.github.novakov-alexey"
 ThisBuild / turbo := true
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
 resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.ivy2/local"
 
@@ -13,6 +14,10 @@ lazy val root = (project in file("."))
     addCompilerPlugin(betterMonadicFor),
     libraryDependencies ++= Seq(
       freya,
+      freyaCirce,
+      circeCore,
+      circeGeneric,
+      circeExtra,
       codecs,
       osClient,
       scalaLogging,
@@ -22,7 +27,8 @@ lazy val root = (project in file("."))
       scalaCheck % Test,
       scalaTestCheck % Test,
       osServerMock % Test,
-      jacksonJsonSchema % Test
+      jacksonJsonSchema % Test,
+      jacksonScala % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
     dockerRepository := Some("alexeyn"),

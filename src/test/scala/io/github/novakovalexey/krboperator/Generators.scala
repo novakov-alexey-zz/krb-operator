@@ -2,8 +2,6 @@ package io.github.novakovalexey.krboperator
 
 import freya.Metadata
 import freya.models.CustomResource
-import io.github.novakovalexey.krboperator.Password.{Random, Static}
-import io.github.novakovalexey.krboperator.Secret.{Keytab, KeytabAndPassword}
 import org.scalacheck.{Arbitrary, Gen}
 
 object Generators {
