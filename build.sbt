@@ -16,7 +16,6 @@ lazy val root = (project in file("."))
       freya,
       freyaCirce,
       circeCore,
-      circeGeneric,
       circeExtra,
       codecs,
       osClient,

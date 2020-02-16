@@ -40,7 +40,6 @@ object Dependencies extends AutoPlugin {
     val freya                    = "io.github.novakov-alexey"  %% "freya-core"                 % freyaVersion
     val freyaCirce               = "io.github.novakov-alexey"  %% "freya-circe"                % freyaVersion
     val circeCore                = "io.circe"                  %% "circe-core"                 % circeVersion
-    val circeGeneric             = "io.circe"                  %% "circe-generic"              % circeVersion
     val circeExtra               = "io.circe"                  %% "circe-generic-extras"       % circeExtrasVersion
     val jacksonJsonSchema        = "com.kjetland"               %% "mbknor-jackson-jsonschema" % jacksonJsonSchemaV
     val jacksonScala             = "com.fasterxml.jackson.module" %% "jackson-module-scala"    % jacksonScalaVersion
