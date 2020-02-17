@@ -209,7 +209,7 @@ class KrbTest
   }
 
   property("delete Kerberos and principals") {
-    forAll(Generators.customResource, arbitrary[Boolean]) { (cr, isAdd) =>
+    forAll(Generators.customResource, arbitrary[Boolean]) { (cr, _) =>
       //given
       val server = startServer
       val mod = createModule(cr.metadata, server)
