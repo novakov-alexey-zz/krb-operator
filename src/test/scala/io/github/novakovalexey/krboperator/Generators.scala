@@ -25,7 +25,8 @@ object Generators {
   def keytabAndPasswordSecret: Gen[KeytabAndPassword] =
     nonEmptyString.map(KeytabAndPassword)
 
-  def password: Gen[Password] = Gen.frequency[Password]((1, nonEmptyString.map(Static)), (1, Gen.const(Random())))
+  def password: Gen[Password] =
+    Gen.frequency[Password]((1, nonEmptyString.map(Static)), (1, Gen.const(Random)))
 
   def principal: Gen[Principal] =
     for {
