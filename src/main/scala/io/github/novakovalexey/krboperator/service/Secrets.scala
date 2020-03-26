@@ -12,6 +12,7 @@ import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.krboperator.{KeytabAndPassword, KrbOperatorCfg}
 import io.github.novakovalexey.krboperator.service.Secrets._
+import io.github.novakovalexey.krboperator.Utils._
 
 import scala.jdk.CollectionConverters._
 
@@ -20,6 +21,9 @@ object Secrets {
 }
 
 class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: Sync[F]) extends LazyLogging {
+  private val debug = logDebugWithNamespace(logger)
+  private val info = logInfoWithNamespace(logger)
+  private val error = logErrorWithNamespace(logger)
 
   def getAdminPwd(meta: Metadata): F[String] =
     F.delay {
@@ -35,7 +39,7 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
         val pwd = Option(s.getData).flatMap(_.asScala.toMap.get(cfg.adminPwd.secretKey))
         pwd match {
           case Some(p) =>
-            logger.info(s"Found admin password for $meta")
+            info(meta.namespace, s"Found admin password for $meta")
             val decoded = Base64.getDecoder.decode(p)
             F.pure(new String(decoded))
           case None =>
@@ -47,13 +51,13 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
         F.raiseError[String](new RuntimeException(s"Failed to find a secret '${cfg.adminPwd.secretName}'"))
     }.onError {
       case t: Throwable =>
-        F.delay(logger.error("Failed to get an admin password", t))
+        F.delay(error(meta.namespace, "Failed to get an admin password", t))
     }
 
   def createSecret(namespace: String, principals: List[PrincipalsWithKey], secretName: String): F[Unit] =
     F.delay {
       val keytabs = principals.map(_.keytabMeta)
-      logger.debug(s"Creating secret for [${keytabs.mkString(",")}] keytabs")
+      debug(namespace, s"Creating secret for [${keytabs.mkString(",")}] keytabs")
       val builder = new SecretBuilder()
         .withNewMetadata()
         .withName(secretName)
@@ -87,7 +91,7 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
     F.delay(client.secrets().inNamespace(namespace).withLabels(principalSecretLabel.asJava).delete())
 
   def findMissing(meta: Metadata, expectedSecrets: Set[String]): F[Set[String]] = {
-    logger.debug(s"Expected secrets to find: ${expectedSecrets.mkString(",")}")
+    debug(meta.namespace, s"Expected secrets to find: ${expectedSecrets.mkString(",")}")
 
     F.delay(Option(client.secrets().inNamespace(meta.namespace).withLabels(principalSecretLabel.asJava).list()))
       .flatMap {

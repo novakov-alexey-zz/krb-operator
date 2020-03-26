@@ -13,7 +13,7 @@ import io.github.novakovalexey.krboperator.{KeytabAndPassword, KrbOperatorCfg, P
 
 import scala.concurrent.duration._
 import scala.util.Random
-
+import io.github.novakovalexey.krboperator.Utils._
 final case class Credentials(username: String, password: String, secret: Secret) {
   override def toString: String = s"Credentials($username, <hidden>)"
 }
@@ -47,11 +47,12 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
 ) extends LazyLogging
     with WaitUtils {
 
+  private val debug = logDebugWithNamespace(logger)
   private val executeInKadmin = pods.executeInPod(client, cfg.kadminContainer) _
 
   def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): F[KerberosState] =
     (for {
-      pod <- waitForPod(context).flatMap(F.fromOption(_, new RuntimeException(s"No Krb POD found for ${context.meta}")))
+      pod <- waitForPod(context).flatMap(F.fromOption(_, new RuntimeException(s"[${context.meta.namespace}] No Krb POD found for ${context.meta}")))
 
       podName = pod.getMetadata.getName
 
@@ -69,7 +70,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
         keytabsOrErrors.sequence
       }
     } yield {
-      logger.debug(s"principals created: $principals")
+      debug(context.meta.namespace, s"principals created: $principals")
       KerberosState(podName, principals)
     }).adaptErr {
       case t => new RuntimeException(s"Failed to create principal(s) & keytab(s) via 'kadmin'", t)
@@ -77,8 +78,8 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
 
   private def waitForPod(context: KadminContext, duration: FiniteDuration = 1.minute): F[Option[Pod]] = {
     val previewPod: Option[Pod] => F[Unit] = pod =>
-      pod.fold(F.delay(logger.debug("Pod is not available yet")))(
-        p => F.delay(logger.debug(s"Pod ${p.getMetadata.getName} is not ready"))
+      pod.fold(F.delay(debug(context.meta.namespace, "Pod is not available yet")))(
+        p => F.delay(debug(context.meta.namespace, s"Pod ${p.getMetadata.getName} is not ready"))
     )
 
     pods.waitForPod(client)(

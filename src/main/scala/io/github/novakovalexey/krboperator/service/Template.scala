@@ -14,6 +14,7 @@ import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.krboperator.service.Template._
 import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
+import io.github.novakovalexey.krboperator.Utils._
 
 import scala.concurrent.duration._
 import scala.io.Source
@@ -94,6 +95,10 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
 ) extends LazyLogging
     with WaitUtils {
 
+  private val debug = logDebugWithNamespace(logger)
+  private val info = logInfoWithNamespace(logger)
+  private val error = logErrorWithNamespace(logger)
+
   val adminSecretSpec: String = replaceParams(
     Paths.get(cfg.k8sSpecsDir, "krb5-admin-secret.yaml"),
     Map(PrefixParam -> cfg.k8sResourcesPrefix, AdminPwdParam -> randomPassword)
@@ -135,19 +140,19 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
       val deleteAdminSecret =
         secret.findAdminSecret(meta).fold(false)(client.secrets().inNamespace(meta.namespace).delete(_))
       val found = if (deleteDeployment || deleteService || deleteAdminSecret) "yes" else "no"
-      logger.info(s"Found resources to delete: $found")
+      info(meta.namespace, s"Found resources to delete: $found")
     }.onError {
       case e: Throwable =>
-        Sync[F].delay(logger.error("Failed to delete", e))
+        Sync[F].delay(error(meta.namespace, "Failed to delete", e))
     }
 
   def waitForDeployment(metadata: Metadata): F[Unit] = {
-    F.delay(logger.info(s"Going to wait for deployment until ready: $deploymentTimeout")) *>
-      waitFor[F](deploymentTimeout) {
+    F.delay(info(metadata.namespace, s"Going to wait for deployment until ready: $deploymentTimeout")) *>
+      waitFor[F](metadata.namespace, deploymentTimeout) {
         F.delay(findDeployment(metadata).exists(resource.isDeploymentReady))
       }.flatMap { ready =>
         if (ready) {
-          F.delay(logger.info(s"deployment is ready: $metadata"))
+          F.delay(info(metadata.namespace, s"deployment is ready: $metadata"))
         } else F.raiseError(new RuntimeException("Failed to wait for deployment is ready"))
       }
   }
@@ -174,7 +179,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
   def createDeployment(meta: Metadata, realm: String): F[Unit] =
     F.delay {
       val content = deploymentSpec(meta.name, realm)
-      logger.debug(s"Creating new deployment for KDC: ${meta.name}")
+      debug(meta.namespace, s"Creating new deployment for KDC: ${meta.name}")
       val is = new ByteArrayInputStream(content.getBytes)
       resource.createOrReplace(client, is, meta)
     }

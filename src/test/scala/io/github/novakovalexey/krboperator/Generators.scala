@@ -48,5 +48,5 @@ object Generators {
     for {
       spec <- krb
       m <- meta
-    } yield CustomResource[Krb, Status](spec, m, None)
+    } yield CustomResource[Krb, Status](m, spec, None)
 }

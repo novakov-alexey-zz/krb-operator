@@ -14,6 +14,7 @@ import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.kubernetes.client.utils.Serialization
 import io.github.novakovalexey.krboperator.service.Kadmin.ExecInPodTimeout
 import okhttp3.Response
+import io.github.novakovalexey.krboperator.Utils._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.jdk.CollectionConverters._
@@ -39,16 +40,18 @@ object PodsAlg {
 }
 
 class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with PodsAlg[F] with WaitUtils {
-
-  private def listener(closed: AtomicBoolean) = new ExecListener {
+  private val debug = logDebugWithNamespace(logger)
+  private val info = logInfoWithNamespace(logger)
+  private val error = logErrorWithNamespace(logger)
+  private def listener(namespace: String, closed: AtomicBoolean) = new ExecListener {
     override def onOpen(response: Response): Unit =
-      logger.debug(s"on open: ${response.body().string()}")
+      debug(namespace, s"on open: ${response.body().string()}")
 
     override def onFailure(t: Throwable, response: Response): Unit =
-      logger.error(s"Failure on 'pod exec': ${response.body().string()}", t)
+      error(namespace, s"Failure on 'pod exec': ${response.body().string()}", t)
 
     override def onClose(code: Int, reason: String): Unit = {
-      logger.debug(s"listener closed with code '$code', reason: $reason")
+      debug(namespace, s"listener closed with code '$code', reason: $reason")
       closed.getAndSet(true)
     }
   }
@@ -72,17 +75,17 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
             .writingError(errStream)
             .writingErrorChannel(errChannelStream)
             .withTTY()
-            .usingListener(listener(isClosed))
+            .usingListener(listener(namespace, isClosed))
 
         val watchers = commands(execablePod)
 
         for {
-          _ <- F.delay(logger.debug(s"Waiting for Pod exec listener to be closed for $ExecInPodTimeout"))
-          closed <- waitFor[F](ExecInPodTimeout)(F.delay(isClosed.get()))
+          _ <- F.delay(debug(namespace, s"Waiting for Pod exec listener to be closed for $ExecInPodTimeout"))
+          closed <- waitFor[F](namespace, ExecInPodTimeout)(F.delay(isClosed.get()))
           _ <- F
             .raiseError[Unit](new RuntimeException(s"Failed to close POD exec listener within $ExecInPodTimeout"))
             .whenA(!closed)
-          _ <- closeExecWatchers(watchers: _*)
+          _ <- closeExecWatchers(namespace, watchers: _*)
           r <- F.delay {
             val ec = getExitCode(errChannelStream)
             val errStreamArr = errStream.toByteArray
@@ -90,7 +93,7 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
           }
         } yield r
       }
-      checked <- checkExitCode(exitCode, errStreamArr)
+      checked <- checkExitCode(namespace, exitCode, errStreamArr)
     } yield checked
   }
 
@@ -100,25 +103,26 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
     else Left(status.getMessage)
   }
 
-  private def checkExitCode(exitCode: Either[String, Int], errStreamArr: Array[Byte]): F[Unit] = {
+  private def checkExitCode(namespace: String, exitCode: Either[String, Int], errStreamArr: Array[Byte]): F[Unit] = {
     exitCode match {
       case Left(e) => F.raiseError[Unit](new RuntimeException(e))
       case _ if errStreamArr.nonEmpty =>
         val e = new String(errStreamArr)
-        logger.error(s"Got error from error stream: $e")
-        F.raiseError[Unit](new RuntimeException(e))
+        val t = new RuntimeException(e)
+        error(namespace, s"Got error from error stream", t)
+        F.raiseError[Unit](t)
       case _ => F.unit
     }
   }
 
-  private def closeExecWatchers(execs: ExecWatch*): F[Unit] = F.delay {
+  private def closeExecWatchers(namespace: String, execs: ExecWatch*): F[Unit] = F.delay {
     val closedCount = execs.foldLeft(0) {
       case (acc, ew) =>
         Using.resource(ew) { _ =>
           acc + 1
         }
     }
-    logger.debug(s"Closed execWatcher(s): $closedCount")
+    debug(namespace, s"Closed execWatcher(s): $closedCount")
   }
 
   def getPod(client: KubernetesClient)(namespace: String, labelKey: String, labelValue: String): Option[Pod] =
@@ -138,8 +142,8 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
     duration: FiniteDuration = 1.minute
   ): F[Option[Pod]] = {
     for {
-      _ <- F.delay(logger.info(s"Going to wait for Pod in namespace ${meta.namespace} until ready: $duration"))
-      (ready, pod) <- waitFor[F, Pod](duration, previewPod) {
+      _ <- F.delay(info(meta.namespace, s"Going to wait for Pod in namespace ${meta.namespace} until ready: $duration"))
+      (ready, pod) <- waitFor[F, Pod](meta.namespace, duration, previewPod) {
         for {
           p <- findPod
           ready <- p match {
@@ -148,7 +152,7 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
           }
         } yield (ready, p)
       }
-      _ <- F.whenA(ready)(F.delay(logger.info(s"POD in namespace ${meta.namespace} is ready ")))
+      _ <- F.whenA(ready)(F.delay(info(meta.namespace, s"POD in namespace ${meta.namespace} is ready ")))
     } yield pod
   }
 }

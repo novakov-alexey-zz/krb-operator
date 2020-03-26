@@ -13,6 +13,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.openshift.client.OpenShiftClient
 import io.github.novakovalexey.krboperator.KrbController._
 import io.github.novakovalexey.krboperator.service._
+import Utils._ 
 
 object KrbController {
   val checkMark: String = "\u2714"
@@ -30,24 +31,27 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     extends Controller[F, Krb, Status]
     with LazyLogging {
 
+  private val debug = logDebugWithNamespace(logger)
+  private val info = logInfoWithNamespace(logger)
+
   override def onAdd(krb: CustomResource[Krb, Status]): F[NewStatus[Status]] = {
-    logger.info(s"'add' event: ${krb.spec}, ${krb.metadata}")
+    info(krb.metadata.namespace, s"'add' event: ${krb.spec}, ${krb.metadata}")
     onApply(krb.spec, krb.metadata)
   }
 
   override def onModify(krb: CustomResource[Krb, Status]): F[NewStatus[Status]] = {
-    logger.info(s"'modify' event: ${krb.spec}, ${krb.metadata}")
+    info(krb.metadata.namespace, s"'modify' event: ${krb.spec}, ${krb.metadata}")
     onApply(krb.spec, krb.metadata)
   }
 
   override def reconcile(krb: CustomResource[Krb, Status]): F[NewStatus[Status]] = {
-    logger.debug(s"reconcile event: ${krb.spec}, ${krb.metadata}")
+    debug(krb.metadata.namespace, s"reconcile event: ${krb.spec}, ${krb.metadata}")  
     onApply(krb.spec, krb.metadata)
   }
 
   override def onDelete(krb: CustomResource[Krb, Status]): F[Unit] =
     for {
-      _ <- F.delay(logger.info(s"delete event: ${krb.spec}, ${krb.metadata}"))
+      _ <- F.delay(info(krb.metadata.namespace, s"delete event: ${krb.spec}, ${krb.metadata}"))
       _ <- template.delete(krb.spec, krb.metadata)
       _ <- secret.deleteSecrets(krb.metadata.namespace)
     } yield ()
@@ -56,51 +60,51 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     for {
       _ <- template.findService(meta) match {
         case Some(_) =>
-          logger.debug(s"$checkMark [${meta.name}] Service is found, so skipping its creation")
+          debug(meta.namespace, s"$checkMark [${meta.name}] Service is found, so skipping its creation")
           F.unit
         case None =>
           for {
             _ <- template.createService(meta)
-            _ = logger.info(s"$checkMark Service ${meta.name} created")
+            _ = info(meta.namespace, s"$checkMark Service ${meta.name} created")
           } yield ()
       }
       _ <- secret.findAdminSecret(meta) match {
         case Some(_) =>
-          logger.debug(s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation")
+          debug(meta.namespace, s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation")
           F.unit
         case None =>
           for {
             _ <- secret.createAdminSecret(meta, template.adminSecretSpec)
-            _ = logger.info(s"$checkMark Admin secret ${meta.name} created")
+            _ = info(meta.namespace, s"$checkMark Admin secret ${meta.name} created")
           } yield ()
       }
       _ <- template.findDeployment(meta) match {
         case Some(_) =>
-          logger.debug(s"$checkMark [${meta.name}] Deployment is found, so skipping its creation")
+          debug(meta.namespace, s"$checkMark [${meta.name}] Deployment is found, so skipping its creation")
           F.unit
         case None =>
           for {
             _ <- template.createDeployment(meta, krb.realm)
             _ <- template.waitForDeployment(meta)
-            _ = logger.info(s"$checkMark deployment ${meta.name} created")
+            _ = info(meta.namespace, s"$checkMark deployment ${meta.name} created")
           } yield ()
       }
 
       missingSecrets <- secret.findMissing(meta, krb.principals.map(_.secret.name).toSet)
       created <- missingSecrets.toList match {
         case Nil =>
-          F.delay(logger.debug(s"There are no missing secrets")) *> F.pure(List.empty[Unit])
+          F.delay(debug(meta.namespace, s"There are no missing secrets")) *> F.pure(List.empty[Unit])
         case _ =>
-          F.delay(logger.info(s"There are ${missingSecrets.size} missing secrets, name(s): $missingSecrets")) *> createSecrets(
+          F.delay(info(meta.namespace, s" There are ${missingSecrets.size} missing secrets, name(s): $missingSecrets")) *> createSecrets(
             krb,
             meta,
             missingSecrets
           )
       }
-      _ <- F.whenA(created.nonEmpty)(F.delay(logger.info(s"${created.length} secrets created")))
+      _ <- F.whenA(created.nonEmpty)(F.delay(info(meta.namespace, s"${created.length} secrets created")))
     } yield Status(processed = true, created.length, krb.principals.length).some
   }.handleErrorWith { e =>
-    F.delay(logger.error(s"Failed to handle create/apply event: $krb, $meta", e)) *>
+    F.delay(logger.error(s"[${meta.namespace}] Failed to handle create/apply event: $krb, $meta", e)) *>
       F.pure(Some(Status(processed = false, 0, krb.principals.length, e.getMessage)))
   }
 
@@ -114,12 +118,12 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
           .map {
             case (secretName, principals) =>
               for {
-                _ <- F.delay(logger.debug(s"Creating secret: $secretName"))
+                _ <- F.delay(debug(meta.namespace, s"Creating secret: $secretName"))
                 state <- kadmin.createPrincipalsAndKeytabs(principals, context)
                 statuses <- copyKeytabs(meta.namespace, state)
                 _ <- checkStatuses(statuses)
                 _ <- secret.createSecret(meta.namespace, state.principals, secretName)
-                _ = logger.info(s"$checkMark Keytab secret $secretName created in ${meta.namespace}")
+                _ = info(meta.namespace, s"$checkMark Keytab secret '$secretName' created")
                 _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
                   logger
                     .error(
@@ -148,7 +152,7 @@ class KrbController[F[_]: Parallel: ConcurrentEffect](
     F.delay(state.principals.foldLeft(List.empty[(Path, Boolean)]) {
       case (acc, principals) =>
         val path = principals.keytabMeta.path
-        logger.debug(s"Copying keytab '$path' from $namespace/${state.podName} POD")
+        debug(namespace, s"Copying keytab '$path' from $namespace/${state.podName} POD")
         val copied = client.pods
           .inNamespace(namespace)
           .withName(state.podName)
