@@ -1,5 +1,6 @@
 {
   "resources":[
+    {"pattern":"logback.xml"},
     {"pattern":"application.conf"},
     {"pattern":"META-INF/services/io.fabric8.kubernetes.api.KubernetesResourceMappingProvider"},
     {"pattern":"META-INF/services/io.fabric8.kubernetes.client.ExtensionAdapter"},

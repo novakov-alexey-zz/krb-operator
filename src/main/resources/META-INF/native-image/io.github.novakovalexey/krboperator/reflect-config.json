@@ -1,8 +1,5 @@
 [
   {
-    "name": "byte[]"
-  },
-  {
     "name": "ch.qos.logback.classic.encoder.PatternLayoutEncoder",
     "allPublicMethods": true,
     "methods": [
@@ -105,18 +102,6 @@
     ]
   },
   {
-    "name": "char[]"
-  },
-  {
-    "name": "com.fasterxml.jackson.databind.deser.Deserializers[]"
-  },
-  {
-    "name": "com.fasterxml.jackson.databind.deser.KeyDeserializers[]"
-  },
-  {
-    "name": "com.fasterxml.jackson.databind.deser.ValueInstantiators[]"
-  },
-  {
     "name": "com.fasterxml.jackson.databind.ext.Java7HandlersImpl",
     "methods": [
       {
@@ -133,9 +118,6 @@
         "parameterTypes": []
       }
     ]
-  },
-  {
-    "name": "com.fasterxml.jackson.databind.ser.Serializers[]"
   },
   {
     "name": "freya.watcher.AnyCustomResource",
@@ -413,60 +395,6 @@
   },
   {
     "name": "io.fabric8.kubernetes.api.model.IntOrString$Deserializer",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.IntOrString$Serializer",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.PodList",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.Pod",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.Status",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.PodCondition",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.PodStatus",
     "methods": [
       {
         "name": "<init>",
