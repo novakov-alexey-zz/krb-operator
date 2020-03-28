@@ -11,11 +11,12 @@
         </encoder>
     </appender>
 
-    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+    <!--Async Appender does not work in native image version-->
+    <!--<appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
         <appender-ref ref="STDOUT"/>
-    </appender>
+    </appender>-->
 
-    <root level="INFO">
-        <appender-ref ref="ASYNCSTDOUT"/>
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT"/>
     </root>
 </configuration>
