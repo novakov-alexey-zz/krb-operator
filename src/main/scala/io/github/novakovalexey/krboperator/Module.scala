@@ -14,6 +14,10 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, OpenShiftConfigBuilder}
 import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
+import io.circe.generic.extras.auto._
+import com.typesafe.scalalogging.LazyLogging
+import org.slf4j.LoggerFactory
+import java.io.File
 
 object Module {
   def defaultClient: OpenShiftClient =

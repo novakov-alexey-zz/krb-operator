@@ -2,10 +2,6 @@ import NativeImage._
 import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 import sbt.Keys.streams
 import sbtrelease.ReleaseStateTransformations._
-import sbt.Keys.streams
-import sbtrelease.ReleaseStateTransformations._
-
-import scala.sys.process._
 
 import scala.sys.process._
 
