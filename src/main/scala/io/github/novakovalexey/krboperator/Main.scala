@@ -36,6 +36,9 @@ object Main extends IOApp {
       .withRestart(Times(maxRetries = 2, delay = 1.second, multiplier = 3))
   }
 
+  /*
+  * needed for GraalVM native image build
+  */
   def initializeLogback(): Unit = {
     val path = sys.env.getOrElse("LOGBACK_CONFIG_FILE", "src/main/resources/logback.xml")
     System.setProperty(CONFIG_FILE_PROPERTY, path)

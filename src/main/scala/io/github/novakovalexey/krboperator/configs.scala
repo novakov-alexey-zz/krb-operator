@@ -27,7 +27,7 @@ final case class Commands(addPrincipal: String, addKeytab: KeytabCommand)
 final case class AdminPassword(secretName: String, secretKey: String)
 
 object AppConfig extends LazyLogging {
-  private val parseOptions = ConfigParseOptions.defaults().setAllowMissing(false)
+  private lazy val parseOptions = ConfigParseOptions.defaults().setAllowMissing(false)
 
   private def cfgPath: String = sys.env.getOrElse("APP_CONFIG_PATH", "src/main/resources/application.conf")
 
