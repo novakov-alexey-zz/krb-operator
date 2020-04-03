@@ -129,7 +129,7 @@ object NativeImage extends AutoPlugin {
      | $nativeImageDocker
      | --static
      | -jar /opt/assembly/$assemblyFatJarName
-     | $outputName""".stripMargin.filter(_ != '\n')
+     | ${outputName}""".stripMargin.filter(_ != '\n')
 
     val log = streams.value.log
     log.info(s"Building native image from ${assemblyFatJarName}")
