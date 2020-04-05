@@ -18,18 +18,18 @@ object NativeImage extends AutoPlugin {
   lazy val nativeImage =
     taskKey[File]("Build a standalone Linux executable using GraalVM Native Image")
 
-  lazy val dockerWithNativeImage =
-    taskKey[Unit]("Build Kerberos Operator Docker image using GraalVM Native Image")
+  lazy val publishDockerNativeImage =
+    taskKey[Unit]("Build and push Kerberos Operator Docker image using GraalVM Native Image")
 
   override def requires = sbtassembly.AssemblyPlugin
   override def trigger = allRequirements
 
   override def projectSettings: Seq[Def.Setting[_]] = Seq[Def.Setting[_]](
-    nativeImageAgentLocal := NativeImage.runNativeImageAgent.value,
-    nativeImageLocal := NativeImage.buildLocal.value,
-    nativeImageAgent := NativeImage.runAgentInDocker.value,
-    nativeImage := NativeImage.build.value,
-    dockerWithNativeImage := NativeImage.publishDockerGraalNative.value
+    nativeImageAgentLocal := runNativeImageAgent.value,
+    nativeImageLocal := buildLocal.value,
+    nativeImageAgent := runAgentInDocker.value,
+    nativeImage := build.value,
+    publishDockerNativeImage := publishDockerGraalNative.value
   )
 
   def runNativeImageAgent = {
@@ -129,7 +129,7 @@ object NativeImage extends AutoPlugin {
      | $nativeImageDocker
      | --static
      | -jar /opt/assembly/$assemblyFatJarName
-     | ${outputName}""".stripMargin.filter(_ != '\n')
+     | $outputName""".stripMargin.filter(_ != '\n')
 
     val log = streams.value.log
     log.info(s"Building native image from ${assemblyFatJarName}")
@@ -146,17 +146,19 @@ object NativeImage extends AutoPlugin {
   }
 
   def publishDockerGraalNative = Def.taskDyn {
-    val imageName = s"${name.value}:${version.value}"
-    val cmd =
-      s"""docker build -f docker/Dockerfile_builder -t $imageName .
-         |""".stripMargin
+    val imageName = s"${name.value}:${version.value}-graal-native"
+    val jarPath = baseDirectory.value.getAbsoluteFile.toPath.relativize( assembly.value.getAbsoluteFile.toPath).toString
+    val repoName = dockerRepositoryNative.value.getOrElse("alexeyn")
+    val dockerBuild = s"docker build -f docker/Dockerfile_builder -t $imageName --build-arg KRB_OPERATOR_JAR_PATH=$jarPath ."
+    val dockerTag = s"docker tag $imageName $repoName/$imageName"
+    val dockerPush = s"docker push $repoName/$imageName"
 
-    //docker tag $imageName ${dockerRepositoryNative.value.getOrElse("alexeyn")}/$imageName
-    println(cmd)
     val log = streams.value.log
     log.info(s"Building Kerberos Operator Docker image using GraalVM native image of the operator")
-    log.debug(cmd)
-    cmd.!(log)
+    log.debug(dockerBuild)
+    log.debug(dockerTag)
+    log.debug(dockerPush)
+    dockerBuild.#&&(dockerTag).#&&(dockerPush).!(log)
     Def.task {
       ()
     }

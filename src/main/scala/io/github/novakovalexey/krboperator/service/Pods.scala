@@ -99,8 +99,11 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
 
   private def getExitCode(errChannelStream: ByteArrayOutputStream): Either[String, Int] = {
     val status = Serialization.unmarshal(errChannelStream.toString, classOf[Status])
-    if (status.getStatus.equals("Success")) Right(0)
-    else Left(status.getMessage)
+    Option(status.getStatus) match {
+      case Some("Success") => Right(0)
+      case None => Left("Status is null")
+      case Some(s) => Left(status.getMessage)
+    }
   }
 
   private def checkExitCode(namespace: String, exitCode: Either[String, Int], errStreamArr: Array[Byte]): F[Unit] = {

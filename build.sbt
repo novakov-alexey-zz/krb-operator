@@ -13,7 +13,7 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 
 resolvers += "Local Maven Repository".at("file://" + Path.userHome.absolutePath + "/.ivy2/local")
 
-lazy val dockerRepo = Some("alexey")
+lazy val dockerRepo = Some("alexeyn")
 
 lazy val root = (project in file("."))
   .settings(
@@ -71,6 +71,7 @@ releaseProcess :=
     inquireVersions,
     setReleaseVersion,
     releaseStepCommandAndRemaining("docker:publish"),
+    releaseStepTask(publishDockerNativeImage),
     commitReleaseVersion,
     tagRelease,
     inquireVersions,
