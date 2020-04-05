@@ -148,7 +148,7 @@ object NativeImage extends AutoPlugin {
   def publishDockerGraalNative = Def.taskDyn {
     val imageName = s"${name.value}:${version.value}"
     val cmd =
-      s"""docker build -f docker/Dockerfile -t $imageName .
+      s"""docker build -f docker/Dockerfile_builder -t $imageName .
          |""".stripMargin
 
     //docker tag $imageName ${dockerRepositoryNative.value.getOrElse("alexeyn")}/$imageName
