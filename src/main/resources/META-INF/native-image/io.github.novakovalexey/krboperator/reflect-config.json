@@ -421,6 +421,60 @@
     ]
   },
   {
+    "name": "io.fabric8.kubernetes.api.model.IntOrString$Serializer",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.PodList",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.Pod",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.Status",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.PodCondition",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.PodStatus",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
     "name": "io.fabric8.kubernetes.api.model.KeyToPath",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
