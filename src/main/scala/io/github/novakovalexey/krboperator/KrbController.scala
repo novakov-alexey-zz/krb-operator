@@ -19,7 +19,7 @@ object KrbController {
   val checkMark: String = "\u2714"
 }
 
-class KrbController[F[_]: Parallel: ConcurrentEffect](
+class KrbController[F[_]: Parallel](
   client: OpenShiftClient,
   cfg: CrdConfig,
   operatorCfg: KrbOperatorCfg,
