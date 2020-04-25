@@ -1,17 +1,18 @@
 package io.github.novakovalexey.krboperator
 
 import cats.Parallel
-import cats.effect.{ConcurrentEffect, Sync, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
 import freya.Configuration.CrdConfig
 import freya.K8sNamespace.{AllNamespaces, CurrentNamespace, Namespace}
 import freya._
 import freya.json.circe._
+import io.circe.generic.extras.auto._
 import io.fabric8.kubernetes.api.model.HasMetadata
 import io.fabric8.kubernetes.api.model.apps.Deployment
+import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, OpenShiftConfigBuilder}
 import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
-import io.circe.generic.extras.auto._
 
 object Module {
   def defaultClient: OpenShiftClient =
@@ -27,12 +28,10 @@ object Module {
     )
 }
 
-class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShiftClient = Module.defaultClient)(
+class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[KubernetesClient])(
   implicit pathGen: KeytabPathAlg
 ) extends Codecs {
   val operatorCfg: KrbOperatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
-  val secret = new Secrets[F](client, operatorCfg)
-  val kadmin = new Kadmin[F](client, operatorCfg)
   val cfg: CrdConfig = CrdConfig(
     NamespaceHelper.getNamespace,
     "io.github.novakov-alexey",
@@ -42,23 +41,35 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: OpenShift
     )
   )
 
-  lazy val openShiftTemplate: Template[F, DeploymentConfig] =
-    new Template[F, DeploymentConfig](client, secret, operatorCfg)
+  def openShiftTemplate(client: OpenShiftClient, secrets: Secrets[F]): Template[F, DeploymentConfig] =
+    new Template[F, DeploymentConfig](client, secrets, operatorCfg)
 
-  def k8sTemplate(implicit resource: DeploymentResource[Deployment]): Template[F, Deployment] =
-    new Template[F, Deployment](client, secret, operatorCfg)
+  def k8sTemplate(client: OpenShiftClient, secrets: Secrets[F])(
+    implicit resource: DeploymentResource[Deployment]
+  ): Template[F, Deployment] =
+    new Template[F, Deployment](client, secrets, operatorCfg)
 
-  def controller(h: CrdHelper[F, Krb, Status]): Controller[F, Krb, Status] = {
+  def controller(h: CrdHelper[F, Krb, Status]): KubernetesClient => KrbController[F] = (client: KubernetesClient) => {
+    val secrets = new Secrets[F](client, operatorCfg)
+    val kadmin = new Kadmin[F](client, operatorCfg)
+    val openShiftClient = client.asInstanceOf[OpenShiftClient]
     val template: Template[F, _ <: HasMetadata] =
-      if (h.context.isOpenShift.getOrElse(false)) openShiftTemplate
-      else k8sTemplate
-    controllerFor(template)
+      if (h.context.isOpenShift.getOrElse(false))
+        openShiftTemplate(openShiftClient, secrets)
+      else k8sTemplate(openShiftClient, secrets)
+    controllerFor(openShiftClient, template, secrets, kadmin)
   }
 
-  def controllerFor(template: Template[F, _ <: HasMetadata], parallelSecret: Boolean = true): KrbController[F] =
-    new KrbController[F](client, cfg, operatorCfg, template, kadmin, secret, parallelSecret)
+  def controllerFor(
+    client: OpenShiftClient,
+    template: Template[F, _ <: HasMetadata],
+    secrets: Secrets[F],
+    kadmin: Kadmin[F],
+    parallelSecret: Boolean = true
+  ): KrbController[F] =
+    new KrbController[F](client, cfg, operatorCfg, template, kadmin, secrets, parallelSecret)
 
-  lazy val operator = Operator.ofCrd[F, Krb, Status](cfg, Sync[F].pure(client))(controller)
+  lazy val operator = Operator.ofCrd[F, Krb, Status](cfg, client)(controller)
 }
 
 object NamespaceHelper {

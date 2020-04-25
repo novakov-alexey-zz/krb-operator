@@ -11,7 +11,7 @@ object Main extends IOApp {
   implicit val ioPar: Parallel[IO] = cats.effect.IO.ioParallel
 
   override def run(args: List[String]): IO[ExitCode] = {
-    val mod = new Module[IO]
+    val mod = new Module[IO](IO(Module.defaultClient))
     IO(println("""
         | _  __     _    _____    ____                       _             
         || |/ /    | |  | ____|  / __ \                     | |            

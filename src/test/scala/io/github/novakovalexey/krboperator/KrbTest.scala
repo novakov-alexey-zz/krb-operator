@@ -35,7 +35,7 @@ class KrbTest
   val tempDir = "tempDir"
 
   object expectations {
-    def forApply(
+    def setup(
       server: OpenShiftServer,
       meta: Metadata,
       podName: String,
@@ -55,6 +55,16 @@ class KrbTest
                 .withNewMetadata()
                 .withName(podName)
                 .endMetadata()
+                .withStatus(
+                  new PodStatusBuilder()
+                    .withConditions(
+                      new PodConditionBuilder()
+                        .withType("Ready")
+                        .withStatus("True")
+                        .build()
+                    )
+                    .build()
+                )
                 .build()
             )
             .build()
@@ -196,8 +206,8 @@ class KrbTest
       val server = startServer
       val mod = createModule(cr.metadata, server)
 
-      expectations.forApply(server, cr.metadata, testPod, mod.operatorCfg, cr.spec, tempDir)
-      val controller = createController(mod)
+      expectations.setup(server, cr.metadata, testPod, mod.operatorCfg, cr.spec, tempDir)
+      val controller = createController(mod, server.getOpenshiftClient)
 
       // when
       val res = if (isAdd) controller.onAdd(cr) else controller.onModify(cr)
@@ -215,7 +225,7 @@ class KrbTest
       val mod = createModule(cr.metadata, server)
 
       expectations.forDelete(server, cr.metadata, mod.operatorCfg)
-      val controller = createController(mod)
+      val controller = createController(mod, server.getOpenshiftClient)
 
       // when
       val res = controller.onDelete(cr)
@@ -226,9 +236,19 @@ class KrbTest
     }
   }
 
-  private def createController(mod: Module[IO]) = {
+  private def createController(mod: Module[IO], client: KubernetesClient) = {
     implicit val resource: DeploymentResource[Deployment] = mockDeployment
-    val controller = mod.controllerFor(mod.k8sTemplate, parallelSecret = false)
+    val secrets = new Secrets[IO](client, mod.operatorCfg)
+    val kadmin = new Kadmin[IO](client, mod.operatorCfg)
+    val openShiftClient = client.asInstanceOf[OpenShiftClient]
+    val controller =
+      mod.controllerFor(
+        openShiftClient,
+        mod.k8sTemplate(openShiftClient, secrets),
+        secrets,
+        kadmin,
+        parallelSecret = false
+      )
     controller
   }
 
@@ -236,7 +256,7 @@ class KrbTest
     implicit val pods: Pods[IO] = mockPods(testPod, meta)
     implicit val pathGen: KeytabPathAlg = (_: String, name: String) => s"/tmp/$tempDir/$name"
 
-    new Module[IO](server.getOpenshiftClient)
+    new Module[IO](IO(server.getOpenshiftClient))
   }
 
   private def stopServer(server: OpenShiftServer): Unit =

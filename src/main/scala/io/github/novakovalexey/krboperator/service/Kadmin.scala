@@ -85,7 +85,8 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
     pods.waitForPod(client)(
       context.meta,
       previewPod,
-      F.delay(pods.getPod(client)(context.meta.namespace, Template.DeploymentSelector, context.meta.name))
+      F.delay(pods.getPod(client)(context.meta.namespace, Template.DeploymentSelector, context.meta.name)),
+      duration
     )
   }
 
