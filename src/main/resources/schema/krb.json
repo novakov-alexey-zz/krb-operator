@@ -2,7 +2,6 @@
   "type": "object",
   "properties": {
     "spec": {
-      "$schema": "http://json-schema.org/draft-04/schema#",
       "title": "Krb",
       "type": "object",
       "properties": {
@@ -14,83 +13,55 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": {
-                "type": "string"
-              },
               "password": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
                 "oneOf": [
                   {
-                    "type": "object",
                     "properties": {
                       "type": {
-                        "type": "string",
                         "enum": [
-                          "static"
-                        ]
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "title": "static",
-                    "required": [
-                      "type"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "enum": [
+                          "static",
                           "random"
                         ]
                       }
-                    },
-                    "title": "random",
-                    "required": [
-                      "type"
-                    ]
+                    }
                   }
                 ]
+              },
+              "name": {
+                "type": "string"
               },
               "keytab": {
                 "type": "string"
               },
               "secret": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
                 "oneOf": [
                   {
-                    "type": "object",
                     "properties": {
                       "type": {
-                        "type": "string",
                         "enum": [
-                          "Keytab"
-                        ]
-                      },
-                      "name": {
-                        "type": "string"
-                      }
-                    },
-                    "title": "Keytab",
-                    "required": [
-                      "type"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "type": {
-                        "type": "string",
-                        "enum": [
+                          "Keytab",
                           "KeytabAndPassword"
                         ]
-                      },
-                      "name": {
-                        "type": "string"
                       }
                     },
-                    "title": "KeytabAndPassword",
                     "required": [
                       "type"
                     ]
