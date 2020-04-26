@@ -32,7 +32,10 @@ lazy val root = (project in file("."))
     dockerBaseImage := "openjdk:8-jre-alpine",
     dockerRepository := Some("alexeyn"),
     javaOptions in Universal ++= Seq("-Dlogback.configurationFile=/opt/conf/logback.xml"),
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoOptions += BuildInfoOption.BuildTime
   )
+  .enablePlugins(BuildInfoPlugin)
   .enablePlugins(AshScriptPlugin)
 
 mappings in Universal ++= directory("src/main/resources")
