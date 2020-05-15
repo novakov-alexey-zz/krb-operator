@@ -16,7 +16,7 @@ import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, Ope
 import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
 
 object Module {
-  def defaultClient: OpenShiftClient =
+  def defaultClient: KubernetesClient =
     new DefaultOpenShiftClient(
       new OpenShiftConfigBuilder()
         .withWebsocketTimeout(30 * 1000)
