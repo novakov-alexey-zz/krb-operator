@@ -29,6 +29,8 @@ lazy val root = (project in file("."))
           logbackClassic,
           janino,
           pureConfig,
+          "org.bouncycastle" % "bcpkix-jdk15on" % "1.58",
+          "org.apache.commons" % "commons-compress" % "1.20",
           scalaTest % Test,
           scalaCheck % Test,
           scalaTestCheck % Test,
