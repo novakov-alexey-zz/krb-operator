@@ -2,7 +2,7 @@ package io.github.novakovalexey.krboperator
 
 import cats.Parallel
 import cats.effect.{ExitCode, IO, IOApp}
-import freya.Retry.Infinite
+import freya.Retry.Times
 
 import scala.concurrent.duration._
 
@@ -25,6 +25,6 @@ object Main extends IOApp {
       println(s"version: ${buildinfo.BuildInfo.version}, build time: ${buildinfo.BuildInfo.builtAtString}")
     } *> mod.operator
       .withReconciler(mod.operatorCfg.reconcilerInterval)
-      .withRestart(Infinite(maxDelay = 10.seconds))
+      .withRestart(Times(maxRetries = 2, delay = 1.second, multiplier = 3))
   }
 }
