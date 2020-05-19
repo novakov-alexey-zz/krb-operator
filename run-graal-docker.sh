@@ -7,4 +7,4 @@ docker run \
   -v ~/dev/git/krb-operator/src/main/resources:/opt/docker/resources \
   -v ~/dev/git/krb-operator/src/main/resources/logback.xml:/opt/conf/logback.xml \
   -e K8S_SPECS_DIR=/opt/docker/resources \
-  kerberos-operator:0.4.6-SNAPSHOT-graal-native
+  kerberos-operator:0.4.10-SNAPSHOT-graal-native

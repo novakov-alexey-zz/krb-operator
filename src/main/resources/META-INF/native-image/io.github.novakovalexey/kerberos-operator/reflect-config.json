@@ -1,19 +1,6 @@
 [
   {
-    "name": "byte[]"
-  },
-  {
     "name": "ch.qos.logback.classic.encoder.PatternLayoutEncoder",
-    "allPublicMethods": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "ch.qos.logback.classic.jul.LevelChangePropagator",
     "allPublicMethods": true,
     "methods": [
       {
@@ -105,9 +92,6 @@
     ]
   },
   {
-    "name": "char[]"
-  },
-  {
     "name": "com.fasterxml.jackson.databind.deser.Deserializers[]"
   },
   {
@@ -142,6 +126,15 @@
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
+  },
+  {
+    "name": "freya.watcher.StringPropertyDeserializer",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
   },
   {
     "name": "io.fabric8.kubernetes.api.model.AWSElasticBlockStoreVolumeSource",
@@ -413,60 +406,6 @@
   },
   {
     "name": "io.fabric8.kubernetes.api.model.IntOrString$Deserializer",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.IntOrString$Serializer",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.PodList",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.Pod",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.Status",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.PodCondition",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "io.fabric8.kubernetes.api.model.PodStatus",
     "methods": [
       {
         "name": "<init>",
@@ -990,12 +929,6 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "io.fabric8.kubernetes.api.model.apiextensions.JSON",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
     "name": "io.fabric8.kubernetes.api.model.apiextensions.JSONSchemaProps",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
@@ -1090,36 +1023,6 @@
   {
     "name": "java.io.Serializable",
     "allDeclaredMethods": true
-  },
-  {
-    "name": "java.lang.Boolean",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "java.lang.Comparable",
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "java.lang.Integer",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "java.lang.Number",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl",
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
   },
   {
     "name": "java.lang.Throwable",

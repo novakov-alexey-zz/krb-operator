@@ -146,7 +146,7 @@ object NativeImage extends AutoPlugin {
 
   def publishDockerGraalNative = Def.taskDyn {
     val imageName = s"${name.value}:${version.value}-graal-native"
-    val jarPath = baseDirectory.value.getAbsoluteFile.toPath.relativize( assembly.value.getAbsoluteFile.toPath).toString
+    val jarPath = baseDirectory.value.getAbsoluteFile.toPath.relativize(assembly.value.getAbsoluteFile.toPath).toString
     val repoName = dockerRepositoryNative.value.getOrElse("alexeyn")
     val dockerBuild = s"docker build -f docker/Dockerfile_builder -t $imageName --build-arg KRB_OPERATOR_JAR_PATH=$jarPath ."
     val dockerTag = s"docker tag $imageName $repoName/$imageName"
