@@ -10,7 +10,10 @@ object Dependencies extends AutoPlugin {
       val catsVersion                      = "2.1.1"
       val circeVersion                     = "0.13.0"
       val circeExtrasVersion               = "0.13.0"
+
       val logbackClassicVersion            = "1.3.0-alpha4"
+      val janinoVersion                    = "3.1.0"
+
       val pureConfigVersion                = "0.12.3"
       val scalaLoggingVersion              = "3.9.2"
       val fabric8K8sVersion                = "4.9.1"
@@ -28,6 +31,7 @@ object Dependencies extends AutoPlugin {
 
     val cats                     = "org.typelevel"             %%  "cats-core"                 % catsVersion
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
+    val janino                   =  "org.codehaus.janino"      % "janino"                      % janinoVersion
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
     val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
     val scalaCheck               = "org.scalacheck"            %% "scalacheck"                 % scalaCheckVersion

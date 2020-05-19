@@ -9,11 +9,12 @@ import freya.Metadata
 import io.fabric8.kubernetes.api.model.Pod
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecWatch, Execable}
-import io.github.novakovalexey.krboperator.{KeytabAndPassword, KrbOperatorCfg, Password, Principal, Secret, Static}
+import io.github.novakovalexey.krboperator.Utils._
+import io.github.novakovalexey.krboperator._
 
 import scala.concurrent.duration._
 import scala.util.Random
-import io.github.novakovalexey.krboperator.Utils._
+
 final case class Credentials(username: String, password: String, secret: Secret) {
   override def toString: String = s"Credentials($username, <hidden>)"
 }
@@ -48,11 +49,13 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
     with WaitUtils {
 
   private val debug = logDebugWithNamespace(logger)
-  private val executeInKadmin = pods.executeInPod(client, cfg.kadminContainer) _
+  private lazy val executeInKadmin = pods.executeInPod(client, cfg.kadminContainer) _
 
   def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): F[KerberosState] =
     (for {
-      pod <- waitForPod(context).flatMap(F.fromOption(_, new RuntimeException(s"[${context.meta.namespace}] No Krb POD found for ${context.meta}")))
+      pod <- waitForPod(context).flatMap(
+        F.fromOption(_, new RuntimeException(s"[${context.meta.namespace}] No Krb POD found for ${context.meta}"))
+      )
 
       podName = pod.getMetadata.getName
 
@@ -80,7 +83,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
     val previewPod: Option[Pod] => F[Unit] = pod =>
       pod.fold(F.delay(debug(context.meta.namespace, "Pod is not available yet")))(
         p => F.delay(debug(context.meta.namespace, s"Pod ${p.getMetadata.getName} is not ready"))
-    )
+      )
 
     pods.waitForPod(client)(
       context.meta,
@@ -100,16 +103,14 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
       credentials.foldLeft(List.empty[ExecWatch]) {
         case (watchers, c) =>
           watchers ++ List(
-            createPrincipal(context.realm, context.adminPwd, exe, c),
-            createKeytab(context.realm, context.adminPwd, exe, c, keytabPath)
-          )
+                createPrincipal(context.realm, context.adminPwd, exe, c),
+                createKeytab(context.realm, context.adminPwd, exe, c, keytabPath)
+              )
       }
     }
 
   private def createWorkingDir(namespace: String, podName: String, keytabDir: Path): F[Unit] =
-    executeInKadmin(namespace, podName) { execable =>
-      List(runCommand(List("mkdir", keytabDir.toString), execable))
-    }
+    executeInKadmin(namespace, podName) { execable => List(runCommand(List("mkdir", keytabDir.toString), execable)) }
 
   def removeWorkingDir(namespace: String, podName: String, keytab: Path): F[Unit] =
     executeInKadmin(namespace, podName) { execable =>

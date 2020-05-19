@@ -2,6 +2,7 @@ package io.github.novakovalexey.krboperator
 
 import cats.Parallel
 import cats.effect.{ConcurrentEffect, Timer}
+import com.typesafe.scalalogging.LazyLogging
 import freya.Configuration.CrdConfig
 import freya.K8sNamespace.{AllNamespaces, CurrentNamespace, Namespace}
 import freya._
@@ -31,7 +32,7 @@ object Module {
 class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[KubernetesClient])(
   implicit pathGen: KeytabPathAlg
 ) extends Codecs {
-  val operatorCfg: KrbOperatorCfg = AppConfig.load().fold(e => sys.error(s"failed to load config: $e"), identity)
+  val operatorCfg: KrbOperatorCfg = AppConfig.load.fold(e => sys.error(s"failed to load config: $e"), identity)
   val cfg: CrdConfig = CrdConfig(
     NamespaceHelper.getNamespace,
     "io.github.novakov-alexey",
@@ -69,7 +70,8 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
   ): KrbController[F] =
     new KrbController[F](client, cfg, operatorCfg, template, kadmin, secrets, parallelSecret)
 
-  lazy val operator = Operator.ofCrd[F, Krb, Status](cfg, client)(controller)
+  lazy val operator: Operator[F, Krb, Status] =
+    Operator.ofCrd[F, Krb, Status](cfg, client)(controller)
 }
 
 object NamespaceHelper {
