@@ -157,8 +157,7 @@ object NativeImage extends AutoPlugin {
     log.debug(dockerBuild)
     log.debug(dockerTag)
     log.debug(dockerPush)
-//    dockerBuild.#&&(dockerTag).#&&(dockerPush).!(log)
-    dockerBuild.#&&(dockerTag).!(log)
+    dockerBuild.#&&(dockerTag).#&&(dockerPush).!(log)
     Def.task {
       ()
     }

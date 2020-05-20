@@ -27,8 +27,8 @@ lazy val root = (project in file("."))
           osClient,
           scalaLogging,
           logbackClassic,
-          janino,
           pureConfig,
+          janino,
           "org.bouncycastle" % "bcpkix-jdk15on" % "1.58",
           "org.apache.commons" % "commons-compress" % "1.20",
           scalaTest % Test,
@@ -38,7 +38,6 @@ lazy val root = (project in file("."))
           jacksonJsonSchema % Test,
           jacksonScala % Test
         ),
-    // excludeDependencies += "com.google.android" % "android",
     dockerBaseImage := "openjdk:8-jre-alpine",
     dockerRepository in Docker := dockerRepo,
     javaOptions in Universal ++= Seq("-Dlogback.configurationFile=/opt/conf/logback.xml"),

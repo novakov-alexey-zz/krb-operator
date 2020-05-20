@@ -18,7 +18,7 @@ object Main extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] = {
     initializeLogback()
-    val mod = new Module[IO](IO(IO(Module.defaultClient)))
+    val mod = new Module[IO](IO(Module.defaultClient))
     IO {
       println("""
           | _  __     _    _____    ____                       _
