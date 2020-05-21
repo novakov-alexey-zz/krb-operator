@@ -137,6 +137,54 @@
     ]
   },
   {
+    "name": "io.fabric8.kubernetes.api.model.PodList",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.Pod",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.PodStatus",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.PodCondition",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.PodIP",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.ContainerStatus",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.ContainerState",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.ContainerStateRunning",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "io.fabric8.kubernetes.api.model.AWSElasticBlockStoreVolumeSource",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
