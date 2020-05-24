@@ -16,13 +16,13 @@ object Dependencies extends AutoPlugin {
 
       val pureConfigVersion                = "0.12.3"
       val scalaLoggingVersion              = "3.9.2"
-      val fabric8K8sVersion                = "4.9.1"
+      val fabric8K8sVersion                = "4.10.1"
       val codecsVersion                    = "1.14"
       val jacksonJsonSchemaV               = "1.0.39"
       val jacksonScalaVersion              = "2.10.3"
       val betterMonadicVersion             = "0.3.1"
-      val freyaVersion                     = "0.2.3"
-      val scalaTestVersion                 = "3.1.1"
+      val freyaVersion                     = "0.2.5"
+      val scalaTestVersion                 = "3.1.2"
       val scalaTestCheckVersion            = "3.1.0.0-RC2"
       val scalaCheckVersion                = "1.14.3"
     }
@@ -31,7 +31,9 @@ object Dependencies extends AutoPlugin {
 
     val cats                     = "org.typelevel"             %%  "cats-core"                 % catsVersion
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
-    val janino                   =  "org.codehaus.janino"      % "janino"                      % janinoVersion
+    val janino                   = "org.codehaus.janino"      % "janino"                       % janinoVersion
+    val bcpkix                   = "org.bouncycastle"         % "bcpkix-jdk15on"               % "1.58"
+    val commonCompress           = "org.apache.commons"       % "commons-compress"             % "1.20"
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
     val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
     val scalaCheck               = "org.scalacheck"            %% "scalacheck"                 % scalaCheckVersion
@@ -47,5 +49,7 @@ object Dependencies extends AutoPlugin {
     val circeExtra               = "io.circe"                  %% "circe-generic-extras"       % circeExtrasVersion
     val jacksonJsonSchema        = "com.kjetland"               %% "mbknor-jackson-jsonschema" % jacksonJsonSchemaV
     val jacksonScala             = "com.fasterxml.jackson.module" %% "jackson-module-scala"    % jacksonScalaVersion
+
+    val nativeImageDeps = Seq(janino, bcpkix, commonCompress)
   }
 }

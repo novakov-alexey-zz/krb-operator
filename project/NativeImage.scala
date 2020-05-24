@@ -13,7 +13,7 @@ object NativeImage extends AutoPlugin {
     taskKey[File]("Build a standalone executable on this machine using GraalVM Native Image")
 
   lazy val nativeImageAgent =
-    taskKey[File]("Run Native Image agent iniside the Docker container")
+    taskKey[File]("Run Native Image agent inside the Docker container")
 
   lazy val nativeImage =
     taskKey[File]("Build a standalone Linux executable using GraalVM Native Image")
@@ -61,7 +61,7 @@ object NativeImage extends AutoPlugin {
       val assemblyFatJarPath = assemblyFatJar.getAbsolutePath
       val outputName = "kerberos-operator.local"
       val outputPath = (baseDirectory.value / "out" / outputName).getAbsolutePath
-      val cmd = s"""native-image --verbose
+      val cmd = s"""native-image --verbose --static
      | -jar $assemblyFatJarPath
      | $outputPath""".stripMargin.filter(_ != '\n')
 
@@ -127,7 +127,6 @@ object NativeImage extends AutoPlugin {
      | --volume $resources:/opt/native-image/src/main/resources
      | --volume $kubeCfg:/root/.kube/config
      | $nativeImageDocker
-     | --static
      | -jar /opt/assembly/$assemblyFatJarName
      | $outputName""".stripMargin.filter(_ != '\n')
 
@@ -147,7 +146,7 @@ object NativeImage extends AutoPlugin {
 
   def publishDockerGraalNative = Def.taskDyn {
     val imageName = s"${name.value}:${version.value}-graal-native"
-    val jarPath = baseDirectory.value.getAbsoluteFile.toPath.relativize( assembly.value.getAbsoluteFile.toPath).toString
+    val jarPath = baseDirectory.value.getAbsoluteFile.toPath.relativize(assembly.value.getAbsoluteFile.toPath).toString
     val repoName = dockerRepositoryNative.value.getOrElse("alexeyn")
     val dockerBuild = s"docker build -f docker/Dockerfile_builder -t $imageName --build-arg KRB_OPERATOR_JAR_PATH=$jarPath ."
     val dockerTag = s"docker tag $imageName $repoName/$imageName"
