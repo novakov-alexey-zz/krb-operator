@@ -82,8 +82,8 @@ releaseProcess :=
     checkSnapshotDependencies,
     inquireVersions,
     setReleaseVersion,
-    releaseStepCommandAndRemaining("docker:publish"),
-    releaseStepTask(publishDockerNativeImage),
+    releaseStepTask(publishDockerNativeImage),native 
+    releaseStepCommandAndRemaining("docker:publish"),    
     commitReleaseVersion,
     tagRelease,
     inquireVersions,
