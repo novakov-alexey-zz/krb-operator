@@ -66,7 +66,7 @@ In ordet to to deploy specific version, clone above manifest files and change im
 
 ### GraalVM Native Image 
 
-There is also a parallel build of Kerberos Operator based GraalVM Native Image. Use Docker Image tag: <version>-graal-native.
+There is also a parallel build of Kerberos Operator based GraalVM Native Image. Use Docker Image tag: "&lt;version&gt;-graal-native".
 For example: `kerberos-operator:0.4.11-graal-native`.
 
 Use this tag in Kubernetes or OpenShift manifests (see above).
