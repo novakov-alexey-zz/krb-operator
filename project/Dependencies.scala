@@ -31,7 +31,9 @@ object Dependencies extends AutoPlugin {
 
     val cats                     = "org.typelevel"             %%  "cats-core"                 % catsVersion
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
-    val janino                   =  "org.codehaus.janino"      % "janino"                      % janinoVersion
+    val janino                   = "org.codehaus.janino"      % "janino"                       % janinoVersion
+    val bcpkix                   = "org.bouncycastle"         % "bcpkix-jdk15on"               % "1.58"
+    val commonCompress           = "org.apache.commons"       % "commons-compress"             % "1.20"
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
     val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
     val scalaCheck               = "org.scalacheck"            %% "scalacheck"                 % scalaCheckVersion
@@ -47,5 +49,7 @@ object Dependencies extends AutoPlugin {
     val circeExtra               = "io.circe"                  %% "circe-generic-extras"       % circeExtrasVersion
     val jacksonJsonSchema        = "com.kjetland"               %% "mbknor-jackson-jsonschema" % jacksonJsonSchemaV
     val jacksonScala             = "com.fasterxml.jackson.module" %% "jackson-module-scala"    % jacksonScalaVersion
+
+    val nativeImageDeps = Seq(janino, bcpkix, commonCompress)
   }
 }
