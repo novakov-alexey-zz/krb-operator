@@ -143,6 +143,18 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "io.fabric8.kubernetes.api.model.Status",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.fabric8.kubernetes.api.model.IntOrString$Serializer",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "io.fabric8.kubernetes.api.model.Pod",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
