@@ -1,4 +1,4 @@
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.5.2")
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.7.3")
 addSbtPlugin("io.spray" % "sbt-revolver" % "0.9.1")
 addSbtPlugin("com.orrsella" % "sbt-stats" % "1.0.7")
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.0")
