@@ -11,7 +11,7 @@ object Dependencies extends AutoPlugin {
       val circeVersion                     = "0.13.0"
       val circeExtrasVersion               = "0.13.0"
 
-      val logbackClassicVersion            = "1.3.0-alpha4"
+      val logbackClassicVersion            = "1.3.0-alpha5"
       val janinoVersion                    = "3.1.0"
 
       val pureConfigVersion                = "0.12.3"
