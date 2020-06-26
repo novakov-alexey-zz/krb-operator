@@ -11,15 +11,15 @@ object Dependencies extends AutoPlugin {
       val circeVersion                     = "0.13.0"
       val circeExtrasVersion               = "0.13.0"
 
-      val logbackClassicVersion            = "1.3.0-alpha5"
-      val janinoVersion                    = "3.1.0"
+      val logbackClassicVersion            = "1.3.0-alpha4"
+      val janinoVersion                    = "3.1.2"
 
       val pureConfigVersion                = "0.12.3"
       val scalaLoggingVersion              = "3.9.2"
-      val fabric8K8sVersion                = "4.10.1"
+      val fabric8K8sVersion                = "4.10.2"
       val codecsVersion                    = "1.14"
       val jacksonJsonSchemaV               = "1.0.39"
-      val jacksonScalaVersion              = "2.10.3"
+      val jacksonScalaVersion              = "2.10.4"
       val betterMonadicVersion             = "0.3.1"
       val freyaVersion                     = "0.2.5"
       val scalaTestVersion                 = "3.1.2"
@@ -32,7 +32,7 @@ object Dependencies extends AutoPlugin {
     val cats                     = "org.typelevel"             %%  "cats-core"                 % catsVersion
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
     val janino                   = "org.codehaus.janino"      % "janino"                       % janinoVersion
-    val bcpkix                   = "org.bouncycastle"         % "bcpkix-jdk15on"               % "1.58"
+    val bcpkix                   = "org.bouncycastle"         % "bcpkix-jdk15on"               % "1.65"
     val commonCompress           = "org.apache.commons"       % "commons-compress"             % "1.20"
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
     val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
