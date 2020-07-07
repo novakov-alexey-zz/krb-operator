@@ -32,7 +32,7 @@ object Dependencies extends AutoPlugin {
     val cats                     = "org.typelevel"             %%  "cats-core"                 % catsVersion
     val logbackClassic           = "ch.qos.logback"            %   "logback-classic"           % logbackClassicVersion
     val janino                   = "org.codehaus.janino"      % "janino"                       % janinoVersion
-    val bcpkix                   = "org.bouncycastle"         % "bcpkix-jdk15on"               % "1.65"
+    val bcpkix                   = "org.bouncycastle"         % "bcpkix-jdk15on"               % "1.66"
     val commonCompress           = "org.apache.commons"       % "commons-compress"             % "1.20"
     val scalaLogging             = "com.typesafe.scala-logging" %% "scala-logging"             % scalaLoggingVersion
     val scalaTest                = "org.scalatest"             %%  "scalatest"                 % scalaTestVersion
