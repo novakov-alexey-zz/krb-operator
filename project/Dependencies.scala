@@ -19,7 +19,7 @@ object Dependencies extends AutoPlugin {
       val fabric8K8sVersion                = "4.10.3"
       val codecsVersion                    = "1.14"
       val jacksonJsonSchemaV               = "1.0.39"
-      val jacksonScalaVersion              = "2.11.1"
+      val jacksonScalaVersion              = "2.11.2"
       val betterMonadicVersion             = "0.3.1"
       val freyaVersion                     = "0.2.6"
       val scalaTestVersion                 = "3.2.0"
