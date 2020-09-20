@@ -2,5 +2,7 @@ target
 .idea
 .metals
 .bloop
+project/metals.sbt
 metals.sbt
 out
+.vscode
