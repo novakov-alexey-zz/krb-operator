@@ -30,6 +30,8 @@ spec:
               value: /opt/docker/resources
             - name: NAMESPACE
               value: "ALL"
+            - name: LOGBACK_CONFIG_FILE
+              value: /opt/conf/logback.xml
       volumes:
         - configMap:
             defaultMode: 0777
