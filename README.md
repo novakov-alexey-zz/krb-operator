@@ -197,9 +197,9 @@ deployment.apps/my-krb   1/1     1            1           26s
 Examples:
 
 ```bash
-kubectl create -f examples/my-krb5.yaml
+kubectl create -f examples/my-krb-1.yaml
 # or
-kubectl apply -f examples/my-krb5.yaml
+kubectl apply -f examples/my-krb-1.yaml
 ```
 
 Create or Update resource events are handled in the same way and will create:
@@ -216,5 +216,5 @@ Create or Update resource events are handled in the same way and will create:
 Delete events deletes all objects created by create or apply events: Deployment, Service, POD and Secrets(s)
 
 ```bash
-kubectl delete -f examples/my-krb5.yaml
+kubectl delete -f examples/my-krb-1.yaml
 ```
