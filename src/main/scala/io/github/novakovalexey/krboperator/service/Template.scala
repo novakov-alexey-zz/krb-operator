@@ -12,6 +12,7 @@ import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.OpenShiftClient
+import io.fabric8.openshift.client.internal.readiness.OpenShiftReadiness
 import io.github.novakovalexey.krboperator.service.Template._
 import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
 import io.github.novakovalexey.krboperator.Utils._
@@ -84,7 +85,7 @@ object DeploymentResource {
     override val deploymentSpecName: String = "krb5-deploymentconfig.yaml"
 
     override def isDeploymentReady(resource: DeploymentConfig): Boolean =
-      Readiness.isDeploymentConfigReady(resource)
+      OpenShiftReadiness.isDeploymentConfigReady(resource)
   }
 }
 
