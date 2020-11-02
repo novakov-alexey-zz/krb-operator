@@ -218,3 +218,11 @@ Delete events deletes all objects created by create or apply events: Deployment,
 ```bash
 kubectl delete -f examples/my-krb-1.yaml
 ```
+
+## Build locally
+
+```bash
+sbt docker:publishLocal
+```
+
+Then use your built image in `manifest/*-deployment.yaml` file for `krb-operator` container.

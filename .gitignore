@@ -6,3 +6,4 @@ project/metals.sbt
 metals.sbt
 out
 .vscode
+.bsp
