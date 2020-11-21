@@ -3,7 +3,7 @@ package io.github.novakovalexey.krboperator
 import java.util.Base64
 
 import cats.effect.IO
-import freya.Metadata
+import freya.models.Metadata
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.apps.{Deployment, DeploymentBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
@@ -40,7 +40,7 @@ class KrbTest
       meta: Metadata,
       podName: String,
       cfg: KrbOperatorCfg,
-      krb: Krb,
+      principals: PrincipalList,
       tempDir: String
     ): Unit = {
       server
@@ -81,7 +81,7 @@ class KrbTest
       mockDeployments(server, meta)
       mockSecrets(server, meta, cfg)
 
-      krb.principals.foreach { p =>
+      principals.list.foreach { p =>
         server
           .expect()
           .withPath(
@@ -201,16 +201,20 @@ class KrbTest
   }
 
   property("create Kerberos and principals") {
-    forAll(Generators.customResource, arbitrary[Boolean]) { (cr, isAdd) =>
+    forAll(Generators.customResource, arbitrary[Boolean]) { case ((krb, principals), isAdd) =>
       //given
       val server = startServer
-      val mod = createModule(cr.metadata, server)
+      val mod = createModule(krb.metadata, server)
 
-      expectations.setup(server, cr.metadata, testPod, mod.operatorCfg, cr.spec, tempDir)
-      val controller = createController(mod, server.getOpenshiftClient)
+      expectations.setup(server, krb.metadata, testPod, mod.operatorCfg, principals.spec, tempDir)
+      val (serverController, principalsController) = createController(mod, server.getOpenshiftClient)
 
       // when
-      val res = if (isAdd) controller.onAdd(cr) else controller.onModify(cr)
+      val res = if (isAdd) {
+        serverController.onAdd(krb) *> principalsController.onAdd(principals)
+      } else {
+        serverController.onModify(krb) *> principalsController.onModify(principals)
+      }
       //then
       res.unsafeRunSync()
 
@@ -219,18 +223,17 @@ class KrbTest
   }
 
   property("delete Kerberos and principals") {
-    forAll(Generators.customResource, arbitrary[Boolean]) { (cr, _) =>
+    forAll(Generators.customResource, arbitrary[Boolean]) { case ((krb, principals), _) =>
       //given
       val server = startServer
-      val mod = createModule(cr.metadata, server)
+      val mod = createModule(krb.metadata, server)
 
-      expectations.forDelete(server, cr.metadata, mod.operatorCfg)
-      val controller = createController(mod, server.getOpenshiftClient)
+      expectations.forDelete(server, krb.metadata, mod.operatorCfg)
+      val (serverController, principalsController) = createController(mod, server.getOpenshiftClient)
 
       // when
-      val res = controller.onDelete(cr)
-      //then
-      res.unsafeRunSync()
+      serverController.onDelete(krb).unsafeRunSync()
+      principalsController.onDelete(principals).unsafeRunSync()
 
       stopServer(server)
     }
@@ -241,15 +244,10 @@ class KrbTest
     val secrets = new Secrets[IO](client, mod.operatorCfg)
     val kadmin = new Kadmin[IO](client, mod.operatorCfg)
     val openShiftClient = client.asInstanceOf[OpenShiftClient]
-    val controller =
-      mod.controllerFor(
-        openShiftClient,
-        mod.k8sTemplate(openShiftClient, secrets),
-        secrets,
-        kadmin,
-        parallelSecret = false
-      )
-    controller
+    val serverController =
+      mod.serverControllerFor(mod.k8sTemplate(openShiftClient, secrets), secrets)
+    val principalsController = new PrincipalsController(openShiftClient, secrets, kadmin, mod.operatorCfg, false)
+    (serverController, principalsController)
   }
 
   private def createModule(meta: Metadata, server: OpenShiftServer) = {

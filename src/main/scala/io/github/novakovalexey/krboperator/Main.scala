@@ -3,12 +3,12 @@ package io.github.novakovalexey.krboperator
 import java.io.File
 
 import cats.Parallel
-import cats.effect.{ExitCode, IO, IOApp}
-import freya.Retry.Times
-import cats.syntax.apply._
+import cats.effect.{ExitCode, IO, IOApp, Timer}
 import ch.qos.logback.classic.ClassicConstants.CONFIG_FILE_PROPERTY
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.joran.JoranConfigurator
+import freya.Operator
+import freya.Retry.Times
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
@@ -19,6 +19,8 @@ object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     initializeLogback()
     val mod = new Module[IO](IO(Module.defaultClient))
+    val server = withConfig(mod.serverOperator, mod.operatorCfg.reconcilerInterval)
+    val principals = withConfig(mod.principalsOperator, mod.operatorCfg.reconcilerInterval)
     IO {
       println("""
           | _  __     _    _____    ____                       _
@@ -31,14 +33,16 @@ object Main extends IOApp {
           |                              |_|
           |""".stripMargin)
       println(s"version: ${buildinfo.BuildInfo.version}, build time: ${buildinfo.BuildInfo.builtAtString}")
-    } *> mod.operator
-      .withReconciler(mod.operatorCfg.reconcilerInterval)
-      .withRestart(Times(maxRetries = 2, delay = 1.second, multiplier = 3))
+    } *> IO.race(server, principals).map(_.merge)
   }
 
+  private def withConfig[F[_], T, U](o: Operator[F, T, U], reconcilerInterval: FiniteDuration)(implicit T: Timer[F]) =
+    o.withReconciler(reconcilerInterval)
+      .withRestart(Times(maxRetries = 2, delay = 1.second, multiplier = 3))
+
   /*
-  * needed for GraalVM native image build
-  */
+   * needed for GraalVM native image build
+   */
   def initializeLogback(): Unit = {
     val path = sys.env.getOrElse("LOGBACK_CONFIG_FILE", "src/main/resources/logback.xml")
     System.setProperty(CONFIG_FILE_PROPERTY, path)

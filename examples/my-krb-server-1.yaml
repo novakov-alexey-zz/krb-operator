@@ -1,6 +1,6 @@
 apiVersion: krb-operator.novakov-alexey.github.io/v1
 kind: Krb
 metadata:
-  name: my-krb2
+  name: my-krb1
 spec:
   realm: EXAMPLE.COM

@@ -1,7 +1,6 @@
 package io.github.novakovalexey.krboperator
 
-import freya.Metadata
-import freya.models.CustomResource
+import freya.models.{CustomResource, Metadata}
 import org.scalacheck.{Arbitrary, Gen}
 
 object Generators {
@@ -10,11 +9,15 @@ object Generators {
 
   def arbitrary[T](implicit a: Arbitrary[T]): Gen[T] = a.arbitrary
 
-  def krb: Gen[Krb] =
+  def server: Gen[KrbServer] =
     for {
       realm <- Gen.alphaUpperStr.suchThat(_.nonEmpty)
+    } yield KrbServer(realm)
+
+  def principals: Gen[PrincipalList] =
+    for {
       ps <- Gen.nonEmptyListOf(principal)
-    } yield Krb(realm, ps)
+    } yield PrincipalList(ps)
 
   def secretGen: Gen[Secret] =
     Gen.frequency((1, keytabSecret), (1, keytabAndPasswordSecret))
@@ -42,11 +45,14 @@ object Generators {
       namespace <- nonEmptyString
       version <- nonEmptyString
       uid <- nonEmptyString
-    } yield Metadata(name, namespace, version, uid)
+      labels <- Gen.const(Map(PrincipalsController.ServerLabel -> name))
+    } yield Metadata(name, namespace, labels, version, uid)
 
-  def customResource: Gen[CustomResource[Krb, Status]] =
+  def customResource
+    : Gen[(CustomResource[KrbServer, KrbServerStatus], CustomResource[PrincipalList, PrincipalListStatus])] =
     for {
-      spec <- krb
+      srv <- server
+      ps <- principals
       m <- meta
-    } yield CustomResource[Krb, Status](m, spec, None)
+    } yield (CustomResource[KrbServer, KrbServerStatus](m, srv, None), CustomResource(m, ps, None))
 }
