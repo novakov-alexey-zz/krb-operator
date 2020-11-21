@@ -79,14 +79,27 @@ class KrbTest
         .always()
 
       mockDeployments(server, meta)
-      mockSecrets(server, meta, cfg)
+      mockSecrets(server, meta, cfg, principals.list.map(_.secret.name))
+      mockPodExec(
+        server,
+        principals.list,
+        (p: Principal) =>
+          s"/api/v1/namespaces/${meta.namespace}/pods/$podName/exec?command=sh&command=-c&command=cat+%2Ftmp%2F$tempDir%2F${p.keytab}%7Cbase64&container=${cfg.kadminContainer}&stdout=true"
+      )
+      mockPodExec(
+        server,
+        principals.list,
+        (_: Principal) =>
+          s"/api/v1/namespaces/${meta.namespace}/pods/$podName/exec?command=mkdir&command=%2Ftmp%2F$tempDir&container=${cfg.kadminContainer}&tty=true&stdin=true&stdout=true&stderr=true"
+      )
+    }
 
-      principals.list.foreach { p =>
+    private def mockPodExec(server: OpenShiftServer, principals: List[Principal], path: Principal => String) = {
+      principals.foreach { p =>
+        val mockPath = path(p)
         server
           .expect()
-          .withPath(
-            s"/api/v1/namespaces/${meta.namespace}/pods/$podName/exec?command=sh&command=-c&command=cat+%2Ftmp%2F$tempDir%2F${p.keytab}%7Cbase64&container=${cfg.kadminContainer}&stdout=true"
-          )
+          .withPath(mockPath)
           .andUpgradeToWebSocket()
           .open(new OutputStreamMessage(""))
           .done()
@@ -94,12 +107,21 @@ class KrbTest
       }
     }
 
-    private def mockSecrets(server: OpenShiftServer, meta: Metadata, cfg: KrbOperatorCfg) = {
+    private def mockSecrets(server: OpenShiftServer, meta: Metadata, cfg: KrbOperatorCfg, secretNames: List[String]) = {
+      val secrets = secretNames.map { n =>
+        new SecretBuilder()
+          .withNewMetadata()
+          .withName(n)
+          .withLabels(principalSecretLabel.asJava)
+          .endMetadata()
+          .withType("opaque")
+          .build()
+      }
       server
         .expect()
         .withPath(s"/api/v1/namespaces/${meta.namespace}/secrets?labelSelector=${Utils
           .toUrlEncoded(s"${Secrets.principalSecretLabel.map { case (k, v) => s"$k=$v" }.mkString("")}")}")
-        .andReturn(200, new SecretListBuilder().build())
+        .andReturn(200, new SecretListBuilder().addToItems(secrets: _*).build())
         .always()
 
       server
@@ -242,6 +264,7 @@ class KrbTest
   private def createController(mod: Module[IO], client: KubernetesClient) = {
     implicit val resource: DeploymentResource[Deployment] = mockDeployment
     val secrets = new Secrets[IO](client, mod.operatorCfg)
+    implicit val pathGen: KeytabPathAlg = (_: String, name: String) => s"/tmp/$tempDir/$name"
     val kadmin = new Kadmin[IO](client, mod.operatorCfg)
     val openShiftClient = client.asInstanceOf[OpenShiftClient]
     val serverController =
@@ -252,8 +275,6 @@ class KrbTest
 
   private def createModule(meta: Metadata, server: OpenShiftServer) = {
     implicit val pods: Pods[IO] = mockPods(testPod, meta)
-    implicit val pathGen: KeytabPathAlg = (_: String, name: String) => s"/tmp/$tempDir/$name"
-
     new Module[IO](IO(server.getOpenshiftClient))
   }
 
