@@ -102,7 +102,7 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
     Option(status.getStatus) match {
       case Some("Success") => Right(0)
       case None => Left("Status is null")
-      case Some(s) => Left(status.getMessage)
+      case Some(_) => Left(status.getMessage)
     }
   }
 
