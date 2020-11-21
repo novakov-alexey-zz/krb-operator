@@ -1,6 +1,7 @@
 import sbt.Keys._
 import sbt.{AutoPlugin, Def, File, taskKey, _}
 import sbtassembly.AssemblyKeys._
+import sbtassembly.AssemblyPlugin
 
 import scala.sys.process._
 
@@ -21,7 +22,7 @@ object NativeImage extends AutoPlugin {
   lazy val publishDockerNativeImage =
     taskKey[Unit]("Build and push Kerberos Operator Docker image using GraalVM Native Image")
 
-  override def requires = sbtassembly.AssemblyPlugin
+  override def requires: AssemblyPlugin.type = sbtassembly.AssemblyPlugin
   override def trigger = allRequirements
 
   override def projectSettings: Seq[Def.Setting[_]] = Seq[Def.Setting[_]](
@@ -43,7 +44,7 @@ object NativeImage extends AutoPlugin {
       val log = streams.value.log
       log.info(s"Running native image agent for $assemblyFatJarPath")
       log.debug(cmd)
-      val result = (cmd.!(log))
+      val result = cmd.!(log)
 
       Def.task {
         if (result == 0) file(s"$outputPath")
@@ -79,7 +80,7 @@ object NativeImage extends AutoPlugin {
       }
     }
 
-  lazy val kubeCfg = new File(sys.props("user.home"), ".kube/config").getAbsolutePath
+  lazy val kubeCfg: String = new File(sys.props("user.home"), ".kube/config").getAbsolutePath
 
   def runAgentInDocker = Def.taskDyn {
     val assemblyFatJar = assembly.value
