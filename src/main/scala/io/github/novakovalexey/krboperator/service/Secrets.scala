@@ -7,7 +7,7 @@ import java.util.Base64
 import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.Metadata
+import freya.models.Metadata
 import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.github.novakovalexey.krboperator.{KeytabAndPassword, KrbOperatorCfg}

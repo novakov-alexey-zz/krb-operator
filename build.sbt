@@ -6,7 +6,7 @@ import sbtrelease.ReleaseStateTransformations._
 import scala.sys.process._
 
 name := "kerberos-operator"
-scalaVersion := "2.13.2"
+scalaVersion := "2.13.3"
 ThisBuild / organization := "io.github.novakov-alexey"
 ThisBuild / turbo := true
 Global / onChangedBuildSource := ReloadOnSourceChanges

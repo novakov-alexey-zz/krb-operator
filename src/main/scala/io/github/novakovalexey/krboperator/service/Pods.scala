@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.Metadata
+import freya.models.Metadata
 import io.fabric8.kubernetes.api.model.{Pod, Status}
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}

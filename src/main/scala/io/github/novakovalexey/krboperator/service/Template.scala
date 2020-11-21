@@ -6,16 +6,16 @@ import java.nio.file.{Path, Paths}
 import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.Metadata
+import freya.models.Metadata
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.OpenShiftClient
 import io.fabric8.openshift.client.internal.readiness.OpenShiftReadiness
-import io.github.novakovalexey.krboperator.service.Template._
-import io.github.novakovalexey.krboperator.{Krb, KrbOperatorCfg}
+import io.github.novakovalexey.krboperator.KrbOperatorCfg
 import io.github.novakovalexey.krboperator.Utils._
+import io.github.novakovalexey.krboperator.service.Template._
 
 import scala.concurrent.duration._
 import scala.io.Source
@@ -89,8 +89,8 @@ object DeploymentResource {
   }
 }
 
-class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[F], cfg: KrbOperatorCfg)(
-  implicit F: Sync[F],
+class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[F], cfg: KrbOperatorCfg)(implicit
+  F: Sync[F],
   T: Timer[F],
   resource: DeploymentResource[T]
 ) extends LazyLogging
@@ -124,9 +124,8 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
         .fromFile(pathToFile.toFile)
     ) {
       _.getLines().map { l =>
-        params.view.foldLeft(l) {
-          case (acc, (k, v)) =>
-            acc.replaceAll("\\$\\{" + k + "\\}", v)
+        params.view.foldLeft(l) { case (acc, (k, v)) =>
+          acc.replaceAll("\\$\\{" + k + "\\}", v)
         }
       }.toList
         .mkString("\n")
@@ -134,7 +133,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
 
   private def randomPassword = Random.alphanumeric.take(10).mkString
 
-  def delete(krb: Krb, meta: Metadata): F[Unit] =
+  def delete(meta: Metadata): F[Unit] =
     Sync[F].delay {
       val deleteDeployment = findDeployment(meta).fold(false)(d => resource.delete(client, d))
       val deleteService = findService(meta).fold(false)(client.services().inNamespace(meta.namespace).delete(_))
@@ -142,9 +141,8 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
         secret.findAdminSecret(meta).fold(false)(client.secrets().inNamespace(meta.namespace).delete(_))
       val found = if (deleteDeployment || deleteService || deleteAdminSecret) "yes" else "no"
       info(meta.namespace, s"Found resources to delete: $found")
-    }.onError {
-      case e: Throwable =>
-        Sync[F].delay(error(meta.namespace, "Failed to delete", e))
+    }.onError { case e: Throwable =>
+      Sync[F].delay(error(meta.namespace, "Failed to delete", e))
     }
 
   def waitForDeployment(metadata: Metadata): F[Unit] = {
@@ -169,12 +167,11 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
       val is = new ByteArrayInputStream(serviceSpec(meta.name).getBytes())
       val s = client.services().load(is).get()
       client.services().inNamespace(meta.namespace).createOrReplace(s)
-    }.void.recoverWith {
-      case e =>
-        for {
-          missing <- F.delay(findService(meta)).map(_.isEmpty)
-          error <- F.whenA(missing)(F.raiseError(e))
-        } yield error
+    }.void.recoverWith { case e =>
+      for {
+        missing <- F.delay(findService(meta)).map(_.isEmpty)
+        error <- F.whenA(missing)(F.raiseError(e))
+      } yield error
     }
 
   def createDeployment(meta: Metadata, realm: String): F[Unit] =

@@ -1,10 +1,11 @@
-apiVersion: io.github.novakov-alexey/v1
-kind: Krb
+apiVersion: krb-operator.novakov-alexey.github.io/v1
+kind: PrincipalList
 metadata:
   name: my-krb1
+  labels:
+    krb-operator.novakov-alexey.github.io/server: my-krb1
 spec:
-  realm: EXAMPLE.COM
-  principals:
+  list:
     - name: client1
       password:
         type: static

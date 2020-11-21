@@ -5,7 +5,7 @@ import java.nio.file.{Path, Paths}
 import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.Metadata
+import freya.models.Metadata
 import io.fabric8.kubernetes.api.model.Pod
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecWatch, Execable}
