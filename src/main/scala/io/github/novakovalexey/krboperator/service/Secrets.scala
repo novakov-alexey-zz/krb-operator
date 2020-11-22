@@ -54,7 +54,7 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
         F.delay(error(meta.namespace, "Failed to get an admin password", t))
     }
 
-  def createSecret(namespace: String, principals: List[PrincipalsWithKey], secretName: String): F[Unit] =
+  def create(namespace: String, principals: List[PrincipalsWithKey], secretName: String): F[Unit] =
     F.delay {
       val keytabs = principals.map(_.keytabMeta)
       debug(namespace, s"Creating secret for [${keytabs.mkString(",")}] keytabs")
@@ -87,7 +87,7 @@ class Secrets[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit F: S
       client.secrets().inNamespace(namespace).createOrReplace(secret)
     }
 
-  def deleteSecrets(namespace: String): F[Unit] =
+  def delete(namespace: String): F[Unit] =
     F.delay(client.secrets().inNamespace(namespace).withLabels(principalSecretLabel.asJava).delete())
 
   def findMissing(meta: Metadata, expectedSecrets: Set[String]): F[Set[String]] = {

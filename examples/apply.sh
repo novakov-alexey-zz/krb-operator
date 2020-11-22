@@ -1,4 +1,6 @@
-kubectl create ns test || kubectl create ns test2 
+#!/usr/bin/env bash
+
+kubectl create ns test || kubectl create ns test2
 
 command=$1
 echo "command: $command"

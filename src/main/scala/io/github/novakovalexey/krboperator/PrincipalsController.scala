@@ -43,7 +43,7 @@ class PrincipalsController[F[_]: Parallel](
   ): F[NewStatus[PrincipalListStatus]] = onApply(resource.spec, resource.metadata)
 
   override def onDelete(resource: CustomResource[PrincipalList, PrincipalListStatus]): F[Unit] =
-    F.delay(info(resource.metadata.namespace, s"delete event: ${resource.spec}, ${resource.metadata}")) *> secret.deleteSecrets(
+    F.delay(info(resource.metadata.namespace, s"delete event: ${resource.spec}, ${resource.metadata}")) *> secret.delete(
       resource.metadata.namespace
     )
 
@@ -78,7 +78,7 @@ class PrincipalsController[F[_]: Parallel](
               state <- kadmin.createPrincipalsAndKeytabs(principals, context)
               statuses <- copyKeytabs(meta.namespace, state)
               _ <- checkStatuses(statuses)
-              _ <- secret.createSecret(meta.namespace, state.principals, secretName)
+              _ <- secret.create(meta.namespace, state.principals, secretName)
               _ = info(meta.namespace, s"$checkMark Keytab secret '$secretName' created")
               _ <- removeWorkingDirs(meta.namespace, state).handleError { e =>
                 logger

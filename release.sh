@@ -1,1 +1,0 @@
-sbt -mem 2048 compile 'release with-defaults'
