@@ -4,25 +4,25 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a82d2fa75a3d45828c98b11499d8be95)](https://www.codacy.com/manual/novakov.alex/krb-operator?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=novakov-alexey/krb-operator&amp;utm_campaign=Badge_Grade)
 [![Docker Hub](https://img.shields.io/docker/v/alexeyn/kerberos-operator?color=blue&label=tag)]()
   
-This operator deployes KDC, Kadmin servers and creates principals and their keytabs as secrets.
+This operator deployes KDC, Kadmin servers and creates principals and their keytabs as k8s secrets.
 Developed using [Freya](https://github.com/novakov-alexey/freya) Scala library.
 
 ## Operator use cases
 
 Why to use this Operator?
 
--   Your [SPNEGO](https://en.wikipedia.org/wiki/SPNEGO) authentication requires keytab mounted to a POD: 
+-   Your [SPNEGO](https://en.wikipedia.org/wiki/SPNEGO) authentication requires keytab mounted to a Pod: 
 deploy this operator with required principals to get automatically created secrets with keytabs inside
     
 -   Rapid application development having KDC running inside the K8s cluster: deploy this operator and use 
 automatically created service to call KDC or Kadmin servers
 
 -   Principals and keytabs management using K8s custom resources: deploy this operator using Krb resource
-with required list of principals and their predefined or random passwords 
+with required list of principals, and their predefined or random passwords 
 
 ## How to install
 
-Define namespace as ENV variable:
+Define namespace as environment variable:
 
 ```bash
 NAMESPACE=<put desired namespace>
@@ -56,13 +56,13 @@ oc create \
 
 ### Deploy Specific Operator Version
 
-In ordet to to deploy specific version, clone above manifest files and change image tag for krb-operator container. For example:
+In order to deploy specific version, clone above manifest files and change the image tag in the `krb-operator` container. 
+For example:
 
 ```diff
 -image: alexeyn/kerberos-operator:0.4.10
 +image: alexeyn/kerberos-operator:0.4.11
 ```
-
 
 ### GraalVM Native Image 
 
@@ -81,22 +81,42 @@ kubectl delete -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/
 kubectl delete crd krbs.io.github.novakov-alexey
 ```
 
-## Custom Resource Definition
+## Custom Resource Definitions
 
-Below `Krb` CRD creates:
+### KrbServer
 
--   KDC and Kadmin servers running as two separate containers running in a single POD
--   Principals and their keytabs based on the principal list 
+Below resource creates:
+-   `KDC` and `Kadmin` servers running as two separate containers running in a single Pod 
 
 ```yaml
-apiVersion: io.github.novakov-alexey/v1
-kind: Krb
+apiVersion: krb-operator.novakov-alexey.github.io/v1
+kind: KrbServer
 metadata:
   name: my-krb
   namespace: test
 spec:
-  realm: EXAMPLE.COM
-  principals:
+  realm: EXAMPLE.COM  
+```
+
+#### KrbServer Spec
+
+`realm` - Kerberos realm where all principals will be created
+
+### PrincipalList
+
+Below resource creates:
+-   Principals and their keytabs based on the principal list
+
+```yaml
+apiVersion: krb-operator.novakov-alexey.github.io/v1
+kind: PrincipalList
+metadata:
+  name: my-krb1
+  namespace: test
+  labels:
+    krb-operator.novakov-alexey.github.io/server: my-krb # reference to KrbServer
+spec:
+  list:
     - name: client1
       password:
         type: static
@@ -112,12 +132,11 @@ spec:
         name: cluster-keytab
 ```
 
-## Krb Spec
+#### PrincipalList Spec
+ 
+-   `list` - array of principals 
 
--   `realm` - Kerberos realm where all principals will be created
--   `principals` - array of principals 
-
-Principal properties:
+Principal has the following properties:
 
 -   `name` - principal name without realm in it. Realm will be added automatically using value of `spec.realm` property
 
@@ -142,7 +161,8 @@ Principal properties:
 
 ## Kubernetes objects
 
-Above spec will produce the following objects in the metadata.namespace, i.e. `test` namespace:
+If you apply above two custom resources as is, then it will produce the following objects 
+in the metadata.namespace, i.e. `test` namespace:
 
 ### Secret
 
@@ -174,9 +194,9 @@ A Service for KDC, kadmin, kpasswd with their TCP/UDP ports:
 my-krb   ClusterIP   172.30.37.134  <none>  88/TCP,88/UDP,464/UDP,749/UDP,749/TCP
 ```
 
-### POD
+### Pod
 
-A POD for KDC, kadmin, kpasswd servers with two containers:
+Krb Pod for `KDC`, `kadmin`, `kpasswd` servers is deployed with two containers:
 
 ```bash
 kubectl get pod my-krb-1-gk52x -n test
@@ -185,7 +205,7 @@ NAME             READY   STATUS    RESTARTS   AGE
 my-krb-1-gk52x   2/2     Running   0          24m
 ```
 
-POD is deployed as part of Deployment:
+Krb Pod is deployed as Deployment resource:
 
 ```bash
 NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
@@ -202,18 +222,18 @@ kubectl create -f examples/my-krb-1.yaml
 kubectl apply -f examples/my-krb-1.yaml
 ```
 
-Create or Update resource events are handled in the same way and will create:
+A `create` or `update` resource event are handled in the same way. They will create:
 
--   Deployment, Service, POD, if some of them is missing
+-   Deployment, Service, Pod, if some of them is missing
 
--   Kerberos principal, if its `spec.principals[i].secret` is missing. 
+-   Kerberos principal, if its `spec.list[i].secret` is missing. 
     Changes in values other than `secret` are ignored (current limitation). In order to add new principal to the 
     `spec.principals` either put new/not-existing `secret` name and desired new principal name. Otherwise, delete Krb resource and create new one with 
     the desired `principals`.   
 
 ## Delete resource
 
-Delete events deletes all objects created by create or apply events: Deployment, Service, POD and Secrets(s)
+A `delete` event deletes all objects created by the `create` or `apply` events: Deployment, Service, Pod and Secrets(s)
 
 ```bash
 kubectl delete -f examples/my-krb-1.yaml

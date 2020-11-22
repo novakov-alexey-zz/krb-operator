@@ -1,5 +1,5 @@
 apiVersion: krb-operator.novakov-alexey.github.io/v1
-kind: Krb
+kind: KrbServer
 metadata:
   name: my-krb2
 spec:
