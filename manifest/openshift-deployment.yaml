@@ -18,7 +18,7 @@ spec:
       serviceAccountName: krb-operator
       containers:
         - name: krb-operator
-          image: alexeyn/kerberos-operator:0.4.11
+          image: alexeyn/kerberos-operator:0.4.13
           imagePullPolicy: Always
           volumeMounts:
             - mountPath: /opt/conf/logback.xml
