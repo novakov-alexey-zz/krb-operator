@@ -12,20 +12,19 @@ import io.fabric8.kubernetes.api.model.apps.Deployment
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.openshift.api.model.DeploymentConfig
 import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, OpenShiftConfigBuilder}
-import io.github.novakovalexey.krboperator.Module.OperatorApi
 import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
 
 object Module {
-  val OperatorApi = "io.github.novakov-alexey"
+  val k8sClientTimeout = 30 * 1000
   def defaultClient: KubernetesClient =
     new DefaultOpenShiftClient(
       new OpenShiftConfigBuilder()
-        .withWebsocketTimeout(30 * 1000)
-        .withConnectionTimeout(30 * 1000)
-        .withRequestTimeout(30 * 1000)
-        .withRollingTimeout(30 * 1000)
-        .withScaleTimeout(30 * 1000)
-        .withBuildTimeout(30 * 1000)
+        .withWebsocketTimeout(k8sClientTimeout)
+        .withConnectionTimeout(k8sClientTimeout)
+        .withRequestTimeout(k8sClientTimeout)
+        .withRollingTimeout(k8sClientTimeout)
+        .withScaleTimeout(k8sClientTimeout)
+        .withBuildTimeout(k8sClientTimeout)
         .build()
     )
 }
@@ -34,13 +33,16 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
   pathGen: KeytabPathAlg
 ) extends Codecs {
   val operatorCfg: KrbOperatorCfg = AppConfig.load.fold(e => sys.error(s"failed to load config: $e"), identity)
-  val cfg: CrdConfig = CrdConfig(
+  val serverCfg: CrdConfig = CrdConfig(
     NamespaceHelper.getNamespace,
-    OperatorApi,
+    operatorCfg.operatorPrefix,
     additionalPrinterColumns = List(
       AdditionalPrinterColumn(name = "Realm", columnType = "string", jsonPath = ".spec.realm"),
       AdditionalPrinterColumn(name = "Age", columnType = "date", jsonPath = ".metadata.creationTimestamp")
     )
+  )
+  val principalsCfg = serverCfg.copy(additionalPrinterColumns =
+    List(AdditionalPrinterColumn(name = "Age", columnType = "date", jsonPath = ".metadata.creationTimestamp"))
   )
 
   def openShiftTemplate(client: OpenShiftClient, secrets: Secrets[F]): Template[F, DeploymentConfig] =
@@ -75,10 +77,10 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
     new ServerController[F](template, secrets)
 
   lazy val serverOperator: Operator[F, KrbServer, KrbServerStatus] =
-    Operator.ofCrd[F, KrbServer, KrbServerStatus](cfg, client)(serverController)
+    Operator.ofCrd[F, KrbServer, KrbServerStatus](serverCfg, client)(serverController)
 
   lazy val principalsOperator: Operator[F, PrincipalList, PrincipalListStatus] =
-    Operator.ofCrd[F, PrincipalList, PrincipalListStatus](cfg, client)(principalsController)
+    Operator.ofCrd[F, PrincipalList, PrincipalListStatus](principalsCfg, client)(principalsController)
 }
 
 object NamespaceHelper {

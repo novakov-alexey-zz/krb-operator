@@ -1,5 +1,5 @@
 release:
-	sbt -mem 2048 compile 'release with-defaults'
+	sbt -mem 2048 compile test 'release with-defaults'
 
 run-docker:
 	docker run \

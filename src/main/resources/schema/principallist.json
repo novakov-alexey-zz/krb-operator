@@ -2,13 +2,10 @@
   "type": "object",
   "properties": {
     "spec": {
-      "title": "Krb",
+      "title": "PrincipalList",
       "type": "object",
       "properties": {
-        "realm": {
-          "type": "string"
-        },
-        "principals": {
+        "list": {
           "type": "array",
           "items": {
             "type": "object",
@@ -92,8 +89,7 @@
       "required": [
         "processed",
         "lastPrincipalCount",
-        "totalPrincipalCount",
-        "error"
+        "totalPrincipalCount"
       ]
     }
   }

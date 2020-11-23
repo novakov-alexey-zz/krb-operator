@@ -20,7 +20,8 @@ final case class KrbOperatorCfg(
   kadminContainer: String,
   k8sResourcesPrefix: String,
   adminPwd: AdminPassword,
-  reconcilerInterval: FiniteDuration
+  reconcilerInterval: FiniteDuration,
+  operatorPrefix: String
 )
 final case class KeytabCommand(randomKey: String, noRandomKey: String)
 final case class Commands(addPrincipal: String, addKeytab: KeytabCommand)
