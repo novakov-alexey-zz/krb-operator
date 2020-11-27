@@ -145,7 +145,7 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
     duration: FiniteDuration = 1.minute
   ): F[Option[Pod]] = {
     for {
-      _ <- F.delay(info(meta.namespace, s"Going to wait for Pod in namespace ${meta.namespace} until ready: $duration"))
+      _ <- F.delay(debug(meta.namespace, s"Going to wait for Pod in namespace ${meta.namespace} until ready: $duration"))
       (ready, pod) <- waitFor[F, Pod](meta.namespace, duration, previewPod) {
         for {
           p <- findPod
@@ -155,7 +155,7 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
           }
         } yield (ready, p)
       }
-      _ <- F.whenA(ready)(F.delay(info(meta.namespace, s"POD in namespace ${meta.namespace} is ready ")))
+      _ <- F.whenA(ready)(F.delay(debug(meta.namespace, s"POD in namespace ${meta.namespace} is ready ")))
     } yield pod
   }
 }

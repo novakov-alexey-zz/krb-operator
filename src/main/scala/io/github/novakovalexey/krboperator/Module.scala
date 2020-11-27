@@ -53,8 +53,11 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
   ): Template[F, Deployment] =
     new Template[F, Deployment](client, secrets, operatorCfg)
 
+  var serverHelper: CrdHelper[F, KrbServer, KrbServerStatus] = null // temporary hack
+
   def serverController(h: CrdHelper[F, KrbServer, KrbServerStatus]): KubernetesClient => ServerController[F] =
     (client: KubernetesClient) => {
+      serverHelper = h
       val secrets = new Secrets[F](client, operatorCfg)
       val openShiftClient = client.asInstanceOf[OpenShiftClient]
       val template: Template[F, _ <: HasMetadata] =
@@ -69,8 +72,8 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
     client => {
       val secrets = new Secrets[F](client, operatorCfg)
       val kadmin = new Kadmin[F](client, operatorCfg)
-      val openShiftClient = client.asInstanceOf[OpenShiftClient]
-      new PrincipalsController[F](openShiftClient, secrets, kadmin, operatorCfg, false)
+      val openShiftClient = client.asInstanceOf[OpenShiftClient]      
+      new PrincipalsController[F](serverHelper, openShiftClient, secrets, kadmin, operatorCfg, false)
     }
 
   def serverControllerFor(template: Template[F, _ <: HasMetadata], secrets: Secrets[F]): ServerController[F] =

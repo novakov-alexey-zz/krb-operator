@@ -269,7 +269,10 @@ class KrbTest
     val openShiftClient = client.asInstanceOf[OpenShiftClient]
     val serverController =
       mod.serverControllerFor(mod.k8sTemplate(openShiftClient, secrets), secrets)
-    val principalsController = new PrincipalsController(openShiftClient, secrets, kadmin, mod.operatorCfg, false)
+    val principalsController =
+      new PrincipalsController(null, openShiftClient, secrets, kadmin, mod.operatorCfg, false) {
+        override private[krboperator] def getRealm(meta: Metadata) = IO("test")
+      }
     (serverController, principalsController)
   }
 

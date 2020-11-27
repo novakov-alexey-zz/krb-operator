@@ -1,3 +1,5 @@
+NAMESPACE=test
+
 release:
 	sbt -mem 2048 compile test 'release with-defaults'
 
@@ -20,3 +22,12 @@ run-graal-docker:
 
 docker-local-build:
 	sbt docker:publishLocal
+
+create-krb-server:
+	kubectl create -f examples/my-krb-server-1.yaml -n $(NAMESPACE)
+delete-krb-server:
+	kubectl delete -f examples/my-krb-server-1.yaml -n $(NAMESPACE)
+create-krb-principals:
+	kubectl create -f examples/my-principals-1.yaml -n $(NAMESPACE)
+delete-krb-principals:
+	kubectl delete -f examples/my-principals-1.yaml -n $(NAMESPACE)

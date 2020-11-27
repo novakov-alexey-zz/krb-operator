@@ -6,19 +6,20 @@ import cats.Parallel
 import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import freya.Controller
 import freya.models.{CustomResource, Metadata, NewStatus}
+import freya.{Controller, CrdHelper}
 import io.fabric8.openshift.client.OpenShiftClient
+import io.github.novakovalexey.krboperator.PrincipalsController.ServerLabel
 import io.github.novakovalexey.krboperator.ServerController.checkMark
 import io.github.novakovalexey.krboperator.Utils.{logDebugWithNamespace, logInfoWithNamespace}
 import io.github.novakovalexey.krboperator.service.{Kadmin, KadminContext, KerberosState, Secrets}
-import PrincipalsController.ServerLabel
 
 object PrincipalsController {
   val ServerLabel = "krb-operator.novakov-alexey.github.io/server"
 }
 
 class PrincipalsController[F[_]: Parallel](
+  serverHelper: CrdHelper[F, KrbServer, KrbServerStatus],
   client: OpenShiftClient,
   secret: Secrets[F],
   kadmin: Kadmin[F],
@@ -43,16 +44,12 @@ class PrincipalsController[F[_]: Parallel](
   ): F[NewStatus[PrincipalListStatus]] = onApply(resource.spec, resource.metadata)
 
   override def onDelete(resource: CustomResource[PrincipalList, PrincipalListStatus]): F[Unit] =
-    F.delay(info(resource.metadata.namespace, s"delete event: ${resource.spec}, ${resource.metadata}")) *> secret.delete(
-      resource.metadata.namespace
-    )
+    F.delay(info(resource.metadata.namespace, s"delete event: ${resource.spec}, ${resource.metadata}")) *> secret
+      .delete(resource.metadata.namespace)
 
   private def onApply(principals: PrincipalList, meta: Metadata) =
     for {
-      realm <- F.fromEither(
-        meta.labels.collectFirst { case (ServerLabel, v) => v }
-          .toRight(new RuntimeException(s"Cannot find label '$ServerLabel'"))
-      )
+      realm <- getRealm(meta)
       missingSecrets <- secret.findMissing(meta, principals.list.map(_.secret.name).toSet)
       created <- missingSecrets.toList match {
         case Nil =>
@@ -64,6 +61,20 @@ class PrincipalsController[F[_]: Parallel](
       }
       _ <- F.whenA(created.nonEmpty)(F.delay(info(meta.namespace, s"${created.length} secrets created")))
     } yield PrincipalListStatus(processed = true, created.length, principals.list.length).some
+
+  private[krboperator] def getRealm(meta: Metadata): F[String] = for {
+    serverName <- F.fromEither(meta.labels.collectFirst { case (ServerLabel, v) => v }
+      .toRight(new RuntimeException(s"Current resource does not have a label '$ServerLabel'")))
+    servers <- F.fromEither(serverHelper.currentResources())
+    cr = servers.find { r =>
+      r match {
+        case Left((_, meta)) => meta.getMetadata.getName == serverName
+        case Right(cr) => cr.metadata.name == serverName
+      }
+    }.map(_.leftMap(_._1))
+      .getOrElse(Either.left(new RuntimeException(s"Failed to find server resource with name $serverName")))
+    server <- F.fromEither(cr)
+  } yield server.spec.realm
 
   private def createSecrets(realm: String, principals: PrincipalList, meta: Metadata, missingSecrets: Set[String]) =
     for {
