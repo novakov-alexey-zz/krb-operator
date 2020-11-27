@@ -36,12 +36,12 @@ class KrbTest
 
   object expectations {
     def setup(
-      server: OpenShiftServer,
-      meta: Metadata,
-      podName: String,
-      cfg: KrbOperatorCfg,
-      principals: PrincipalList,
-      tempDir: String
+               server: OpenShiftServer,
+               meta: Metadata,
+               podName: String,
+               cfg: KrbOperatorCfg,
+               principals: Principals,
+               tempDir: String
     ): Unit = {
       server
         .expect()

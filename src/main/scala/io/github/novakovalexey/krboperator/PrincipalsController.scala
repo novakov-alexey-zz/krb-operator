@@ -26,28 +26,28 @@ class PrincipalsController[F[_]: Parallel](
   operatorCfg: KrbOperatorCfg,
   parallelSecret: Boolean = true
 )(implicit F: Sync[F])
-    extends Controller[F, PrincipalList, PrincipalListStatus]
+    extends Controller[F, Principals, PrincipalsStatus]
     with LazyLogging {
   private val debug = logDebugWithNamespace(logger)
   private val info = logInfoWithNamespace(logger)
 
-  override def onAdd(resource: CustomResource[PrincipalList, PrincipalListStatus]): F[NewStatus[PrincipalListStatus]] =
+  override def onAdd(resource: CustomResource[Principals, PrincipalsStatus]): F[NewStatus[PrincipalsStatus]] =
     onApply(resource.spec, resource.metadata)
 
   override def onModify(
-    resource: CustomResource[PrincipalList, PrincipalListStatus]
-  ): F[NewStatus[PrincipalListStatus]] =
+    resource: CustomResource[Principals, PrincipalsStatus]
+  ): F[NewStatus[PrincipalsStatus]] =
     onApply(resource.spec, resource.metadata)
 
   override def reconcile(
-    resource: CustomResource[PrincipalList, PrincipalListStatus]
-  ): F[NewStatus[PrincipalListStatus]] = onApply(resource.spec, resource.metadata)
+    resource: CustomResource[Principals, PrincipalsStatus]
+  ): F[NewStatus[PrincipalsStatus]] = onApply(resource.spec, resource.metadata)
 
-  override def onDelete(resource: CustomResource[PrincipalList, PrincipalListStatus]): F[Unit] =
+  override def onDelete(resource: CustomResource[Principals, PrincipalsStatus]): F[Unit] =
     F.delay(info(resource.metadata.namespace, s"delete event: ${resource.spec}, ${resource.metadata}")) *> secret
       .delete(resource.metadata.namespace)
 
-  private def onApply(principals: PrincipalList, meta: Metadata) =
+  private def onApply(principals: Principals, meta: Metadata) =
     for {
       realm <- getRealm(meta)
       missingSecrets <- secret.findMissing(meta, principals.list.map(_.secret.name).toSet)
@@ -60,7 +60,7 @@ class PrincipalsController[F[_]: Parallel](
           ) *> createSecrets(realm, principals, meta, missingSecrets)
       }
       _ <- F.whenA(created.nonEmpty)(F.delay(info(meta.namespace, s"${created.length} secrets created")))
-    } yield PrincipalListStatus(processed = true, created.length, principals.list.length).some
+    } yield PrincipalsStatus(processed = true, created.length, principals.list.length).some
 
   private[krboperator] def getRealm(meta: Metadata): F[String] = for {
     serverName <- F.fromEither(meta.labels.collectFirst { case (ServerLabel, v) => v }
@@ -76,7 +76,7 @@ class PrincipalsController[F[_]: Parallel](
     server <- F.fromEither(cr)
   } yield server.spec.realm
 
-  private def createSecrets(realm: String, principals: PrincipalList, meta: Metadata, missingSecrets: Set[String]) =
+  private def createSecrets(realm: String, principals: Principals, meta: Metadata, missingSecrets: Set[String]) =
     for {
       pwd <- secret.getAdminPwd(meta)
       context = KadminContext(realm, meta, pwd)

@@ -14,10 +14,10 @@ object Generators {
       realm <- Gen.alphaUpperStr.suchThat(_.nonEmpty)
     } yield KrbServer(realm)
 
-  def principals: Gen[PrincipalList] =
+  def principals: Gen[Principals] =
     for {
       ps <- Gen.nonEmptyListOf(principal)
-    } yield PrincipalList(ps)
+    } yield Principals(ps)
 
   def secretGen: Gen[Secret] =
     Gen.frequency((1, keytabSecret), (1, keytabAndPasswordSecret))
@@ -49,7 +49,7 @@ object Generators {
     } yield Metadata(name, namespace, labels, version, uid)
 
   def customResource
-    : Gen[(CustomResource[KrbServer, KrbServerStatus], CustomResource[PrincipalList, PrincipalListStatus])] =
+    : Gen[(CustomResource[KrbServer, KrbServerStatus], CustomResource[Principals, PrincipalsStatus])] =
     for {
       srv <- server
       ps <- principals

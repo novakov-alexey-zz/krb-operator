@@ -109,7 +109,7 @@ Below resource creates:
 
 ```yaml
 apiVersion: krb-operator.novakov-alexey.github.io/v1
-kind: PrincipalList
+kind: Principals
 metadata:
   name: my-krb1
   namespace: test

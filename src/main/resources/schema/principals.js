@@ -2,7 +2,7 @@
   "type": "object",
   "properties": {
     "spec": {
-      "title": "PrincipalList",
+      "title": "Principals",
       "type": "object",
       "properties": {
         "list": {

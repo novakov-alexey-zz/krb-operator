@@ -146,7 +146,7 @@ class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[
     }
 
   def waitForDeployment(metadata: Metadata): F[Unit] = {
-    F.delay(debug(metadata.namespace, s"Going to wait for deployment until ready: $deploymentTimeout")) *>
+    F.delay(info(metadata.namespace, s"Going to wait for deployment until ready: $deploymentTimeout")) *>
       waitFor[F](metadata.namespace, deploymentTimeout) {
         F.delay(findDeployment(metadata).exists(resource.isDeploymentReady))
       }.flatMap { ready =>

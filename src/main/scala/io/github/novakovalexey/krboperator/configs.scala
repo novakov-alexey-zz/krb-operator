@@ -21,7 +21,8 @@ final case class KrbOperatorCfg(
   k8sResourcesPrefix: String,
   adminPwd: AdminPassword,
   reconcilerInterval: FiniteDuration,
-  operatorPrefix: String
+  operatorPrefix: String,
+  parallelSecretCreation: Boolean
 )
 final case class KeytabCommand(randomKey: String, noRandomKey: String)
 final case class Commands(addPrincipal: String, addKeytab: KeytabCommand)

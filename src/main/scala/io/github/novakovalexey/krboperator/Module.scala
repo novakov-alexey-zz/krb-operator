@@ -67,14 +67,21 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
       serverControllerFor(template, secrets)
     }
 
-  val principalsController
-    : CrdHelper[F, PrincipalList, PrincipalListStatus] => KubernetesClient => PrincipalsController[F] = _ =>
-    client => {
-      val secrets = new Secrets[F](client, operatorCfg)
-      val kadmin = new Kadmin[F](client, operatorCfg)
-      val openShiftClient = client.asInstanceOf[OpenShiftClient]      
-      new PrincipalsController[F](serverHelper, openShiftClient, secrets, kadmin, operatorCfg, false)
-    }
+  val principalsController: CrdHelper[F, Principals, PrincipalsStatus] => KubernetesClient => PrincipalsController[F] =
+    _ =>
+      client => {
+        val secrets = new Secrets[F](client, operatorCfg)
+        val kadmin = new Kadmin[F](client, operatorCfg)
+        val openShiftClient = client.asInstanceOf[OpenShiftClient]
+        new PrincipalsController[F](
+          serverHelper,
+          openShiftClient,
+          secrets,
+          kadmin,
+          operatorCfg,
+          operatorCfg.parallelSecretCreation
+        )
+      }
 
   def serverControllerFor(template: Template[F, _ <: HasMetadata], secrets: Secrets[F]): ServerController[F] =
     new ServerController[F](template, secrets)
@@ -82,8 +89,8 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
   lazy val serverOperator: Operator[F, KrbServer, KrbServerStatus] =
     Operator.ofCrd[F, KrbServer, KrbServerStatus](serverCfg, client)(serverController)
 
-  lazy val principalsOperator: Operator[F, PrincipalList, PrincipalListStatus] =
-    Operator.ofCrd[F, PrincipalList, PrincipalListStatus](principalsCfg, client)(principalsController)
+  lazy val principalsOperator: Operator[F, Principals, PrincipalsStatus] =
+    Operator.ofCrd[F, Principals, PrincipalsStatus](principalsCfg, client)(principalsController)
 }
 
 object NamespaceHelper {

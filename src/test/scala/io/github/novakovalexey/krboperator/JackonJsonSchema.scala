@@ -9,7 +9,7 @@ object JackonJsonSchema extends App {
   objectMapper.registerModule(DefaultScalaModule)
 
   val jsonSchemaGenerator = new JsonSchemaGenerator(objectMapper)
-  val jsonSchema = jsonSchemaGenerator.generateJsonSchema(classOf[PrincipalListStatus])
+  val jsonSchema = jsonSchemaGenerator.generateJsonSchema(classOf[PrincipalsStatus])
 
   val jsonSchemaAsString = objectMapper.writeValueAsString(jsonSchema)
   println(jsonSchemaAsString)

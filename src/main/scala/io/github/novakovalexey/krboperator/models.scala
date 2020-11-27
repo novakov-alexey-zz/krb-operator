@@ -12,10 +12,10 @@ final case class Keytab(name: String) extends Secret
 final case class KeytabAndPassword(name: String) extends Secret
 
 final case class Principal(name: String, password: Password = Random, keytab: String, secret: Secret)
-final case class PrincipalList(list: List[Principal])
+final case class Principals(list: List[Principal])
 final case class KrbServer(realm: String)
 final case class KrbServerStatus(processed: Boolean, error: String = "")
-final case class PrincipalListStatus(
+final case class PrincipalsStatus(
   processed: Boolean,
   lastPrincipalCount: Int,
   totalPrincipalCount: Int,
