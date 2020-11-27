@@ -38,7 +38,7 @@ rules:
     resources: ["customresourcedefinitions"]
     verbs: ["get", "watch", "list", "create"]
   - apiGroups: ["krb-operator.novakov-alexey.github.io"]
-    resources: ["krbservers", "krbservers/status", "principallists", "principallists/status"]
+    resources: ["krbservers", "krbservers/status", "principalss", "principalss/status"]
     verbs: ["watch", "list", "update"]
   # for OpenShift
   - apiGroups: ["apps.openshift.io"]
