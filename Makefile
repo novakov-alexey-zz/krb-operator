@@ -31,3 +31,10 @@ create-krb-principals:
 	kubectl create -f examples/my-principals-1.yaml -n $(NAMESPACE)
 delete-krb-principals:
 	kubectl delete -f examples/my-principals-1.yaml -n $(NAMESPACE)
+
+install:
+	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" manifest/rbac.yaml | kubectl create -n ${NAMESPACE} -f - && \
+	kubectl create -f manifest/kube-deployment.yaml -n $(NAMESPACE)
+uninstall:
+	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" manifest/rbac.yaml | kubectl delete -n ${NAMESPACE} -f -
+	kubectl delete -f manifest/kube-deployment.yaml -n $(NAMESPACE)

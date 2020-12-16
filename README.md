@@ -33,7 +33,7 @@ NAMESPACE=<put desired namespace>
 ```bash
 # install RBAC
 wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
- 	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl create -n ${NAMESPACE} -f -
+    sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl create -n ${NAMESPACE} -f -
 
 # install operator
 kubectl create \

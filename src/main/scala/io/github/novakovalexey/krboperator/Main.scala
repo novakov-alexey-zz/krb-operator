@@ -1,7 +1,6 @@
 package io.github.novakovalexey.krboperator
 
-import java.io.File
-
+import buildinfo.BuildInfo
 import cats.Parallel
 import cats.effect.{ExitCode, IO, IOApp, Timer}
 import ch.qos.logback.classic.ClassicConstants.CONFIG_FILE_PROPERTY
@@ -11,17 +10,18 @@ import freya.Operator
 import freya.Retry.Times
 import org.slf4j.LoggerFactory
 
+import java.io.File
 import scala.concurrent.duration._
 
 object Main extends IOApp {
   implicit val ioPar: Parallel[IO] = cats.effect.IO.ioParallel
 
-  override def run(args: List[String]): IO[ExitCode] = {
-    initializeLogback()
-    val mod = new Module[IO](IO(Module.defaultClient))
-    val server = withConfig(mod.serverOperator, mod.operatorCfg.reconcilerInterval)
-    val principals = withConfig(mod.principalsOperator, mod.operatorCfg.reconcilerInterval)
-    IO {
+  override def run(args: List[String]): IO[ExitCode] = for {
+    _ <- IO(initializeLogback())
+    mod <- IO(new Module[IO](IO(Module.defaultClient)))
+    server = withConfig(mod.serverOperator, mod.operatorCfg.reconcilerInterval)
+    principals = withConfig(mod.principalsOperator, mod.operatorCfg.reconcilerInterval)
+    start <- IO {
       println("""
           | _  __     _    _____    ____                       _
           || |/ /    | |  | ____|  / __ \                     | |
@@ -32,9 +32,9 @@ object Main extends IOApp {
           |                              | |
           |                              |_|
           |""".stripMargin)
-      println(s"version: ${buildinfo.BuildInfo.version}, build time: ${buildinfo.BuildInfo.builtAtString}")
+      println(s"version: ${BuildInfo.version}, build time: ${BuildInfo.builtAtString}")
     } *> IO.race(server, principals).map(_.merge)
-  }
+  } yield start
 
   private def withConfig[F[_], T, U](o: Operator[F, T, U], reconcilerInterval: FiniteDuration)(implicit T: Timer[F]) =
     o.withReconciler(reconcilerInterval)

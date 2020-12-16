@@ -22,20 +22,23 @@ class ServerController[F[_]: Parallel](template: Template[F, _ <: HasMetadata], 
   private val debug = logDebugWithNamespace(logger)
   private val info = logInfoWithNamespace(logger)
 
-  override def onAdd(krb: CustomResource[KrbServer, KrbServerStatus]): F[NewStatus[KrbServerStatus]] = {
-    info(krb.metadata.namespace, s"'add' event: ${krb.spec}, ${krb.metadata}")
-    onApply(krb.spec, krb.metadata)
-  }
+  override def onAdd(krb: CustomResource[KrbServer, KrbServerStatus]): F[NewStatus[KrbServerStatus]] =
+    F.delay(info(krb.metadata.namespace, s"'add' event: ${krb.spec}, ${krb.metadata}")) *> onApply(
+      krb.spec,
+      krb.metadata
+    )
 
-  override def onModify(krb: CustomResource[KrbServer, KrbServerStatus]): F[NewStatus[KrbServerStatus]] = {
-    info(krb.metadata.namespace, s"'modify' event: ${krb.spec}, ${krb.metadata}")
-    onApply(krb.spec, krb.metadata)
-  }
+  override def onModify(krb: CustomResource[KrbServer, KrbServerStatus]): F[NewStatus[KrbServerStatus]] =
+    F.delay(info(krb.metadata.namespace, s"'modify' event: ${krb.spec}, ${krb.metadata}")) *> onApply(
+      krb.spec,
+      krb.metadata
+    )
 
-  override def reconcile(krb: CustomResource[KrbServer, KrbServerStatus]): F[NewStatus[KrbServerStatus]] = {
-    debug(krb.metadata.namespace, s"reconcile event: ${krb.spec}, ${krb.metadata}")
-    onApply(krb.spec, krb.metadata)
-  }
+  override def reconcile(krb: CustomResource[KrbServer, KrbServerStatus]): F[NewStatus[KrbServerStatus]] =
+    F.delay(debug(krb.metadata.namespace, s"reconcile event: ${krb.spec}, ${krb.metadata}")) *> onApply(
+      krb.spec,
+      krb.metadata
+    )
 
   override def onDelete(krb: CustomResource[KrbServer, KrbServerStatus]): F[Unit] =
     F.delay(info(krb.metadata.namespace, s"delete event: ${krb.spec}, ${krb.metadata}")) *> template.delete(
@@ -46,33 +49,27 @@ class ServerController[F[_]: Parallel](template: Template[F, _ <: HasMetadata], 
     for {
       _ <- template.findService(meta) match {
         case Some(_) =>
-          debug(meta.namespace, s"$checkMark [${meta.name}] Service is found, so skipping its creation")
-          F.unit
+          F.delay(debug(meta.namespace, s"$checkMark [${meta.name}] Service is found, so skipping its creation"))
         case None =>
-          for {
-            _ <- template.createService(meta)
-            _ = info(meta.namespace, s"$checkMark Service ${meta.name} created")
-          } yield ()
+          template.createService(meta) *> F.delay(info(meta.namespace, s"$checkMark Service ${meta.name} created"))
       }
       _ <- secret.findAdminSecret(meta) match {
         case Some(_) =>
-          debug(meta.namespace, s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation")
-          F.unit
+          F.delay(debug(meta.namespace, s"$checkMark [${meta.name}] Admin Secret is found, so skipping its creation"))
         case None =>
-          for {
-            _ <- secret.createAdminSecret(meta, template.adminSecretSpec)
-            _ = info(meta.namespace, s"$checkMark Admin secret ${meta.name} created")
-          } yield ()
+          secret.createAdminSecret(meta, template.adminSecretSpec) *> F.delay(
+            info(meta.namespace, s"$checkMark Admin secret ${meta.name} created")
+          )
+
       }
       _ <- template.findDeployment(meta) match {
         case Some(_) =>
-          debug(meta.namespace, s"$checkMark [${meta.name}] Deployment is found, so skipping its creation")
-          F.unit
+          F.delay(debug(meta.namespace, s"$checkMark [${meta.name}] Deployment is found, so skipping its creation"))
         case None =>
           for {
             _ <- template.createDeployment(meta, krb.realm)
             _ <- template.waitForDeployment(meta)
-            _ = info(meta.namespace, s"$checkMark deployment ${meta.name} created")
+            _ <- F.delay(info(meta.namespace, s"$checkMark deployment ${meta.name} created"))
           } yield ()
       }
     } yield KrbServerStatus(processed = true).some

@@ -66,14 +66,14 @@ class PrincipalsController[F[_]: Parallel](
     serverName <- F.fromEither(meta.labels.collectFirst { case (ServerLabel, v) => v }
       .toRight(new RuntimeException(s"Current resource does not have a label '$ServerLabel'")))
     servers <- F.fromEither(serverHelper.currentResources())
-    cr = servers.find { r =>
+    server = servers.find { r =>
       r match {
         case Left((_, meta)) => meta.getMetadata.getName == serverName
         case Right(cr) => cr.metadata.name == serverName
       }
     }.map(_.leftMap(_._1))
       .getOrElse(Either.left(new RuntimeException(s"Failed to find server resource with name $serverName")))
-    server <- F.fromEither(cr)
+    server <- F.fromEither(server)
   } yield server.spec.realm
 
   private def createSecrets(realm: String, principals: Principals, meta: Metadata, missingSecrets: Set[String]) =
