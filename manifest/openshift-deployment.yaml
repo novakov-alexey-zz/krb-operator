@@ -33,6 +33,16 @@ spec:
               value: /opt/docker/resources
             - name: NAMESPACE
               value: "ALL"
+            - name: PARALLEL_SECRET_CREATION
+              value: "false"
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -fl
+                - kerberos-operator
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
         - configMap:
             defaultMode: 0777

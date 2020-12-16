@@ -32,6 +32,16 @@ spec:
               value: "ALL"
             - name: LOGBACK_CONFIG_FILE
               value: /opt/conf/logback.xml
+            - name: PARALLEL_SECRET_CREATION
+              value: "false"
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -fl
+                - kerberos-operator
+            initialDelaySeconds: 20
+            periodSeconds: 20
       volumes:
         - configMap:
             defaultMode: 0777
