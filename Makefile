@@ -32,9 +32,21 @@ create-krb-principals:
 delete-krb-principals:
 	kubectl delete -f examples/my-principals-1.yaml -n $(NAMESPACE)
 
-install:
-	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" manifest/rbac.yaml | kubectl create -n ${NAMESPACE} -f - && \
-	kubectl create -f manifest/kube-deployment.yaml -n $(NAMESPACE)
-uninstall:
-	sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" manifest/rbac.yaml | kubectl delete -n ${NAMESPACE} -f -
-	kubectl delete -f manifest/kube-deployment.yaml -n $(NAMESPACE)
+install-rbac:
+	dhall-to-yaml < manifest/rbac.dhall | kubectl create -n ${NAMESPACE} -f -
+uninstall-rbac:
+	dhall-to-yaml < manifest/rbac.dhall | kubectl delete -n ${NAMESPACE} -f -
+
+install: install-rbac	
+	dhall-to-yaml < manifest/kube-deployment.dhall | kubectl create -n ${NAMESPACE} -f -	
+uninstall: uninstall-rbac
+	dhall-to-yaml < manifest/kube-deployment.dhall | kubectl delete -n ${NAMESPACE} -f -	
+
+install-os: install-rbac	
+	dhall-to-yaml < manifest/kube-deployment.dhall | kubectl create -n ${NAMESPACE} -f -	
+uninstall-os: uninstall-rbac	
+	dhall-to-yaml < manifest/kube-deployment.dhall | kubectl delete -n ${NAMESPACE} -f -	
+
+to-dhall:
+	yaml-to-dhall '(https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/types.dhall).ConfigMap' --file ./manifest/openshift-deployment.yaml \
+	  | dhall rewrite-with-schemas --schemas 'https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/schemas.dhall'

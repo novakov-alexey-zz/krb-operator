@@ -22,36 +22,43 @@ with required list of principals, and their predefined or random passwords
 
 ## How to install
 
+### Prerequisites
+
+- kubectl CLI
+- [dhall CLI](https://docs.dhall-lang.org/tutorials/Getting-started_Generate-JSON-or-YAML.html#installation)
+
+### Installation Steps
+
 Define namespace as environment variable:
 
 ```bash
-NAMESPACE=<put desired namespace>
+export NAMESPACE=<put desired namespace>
 ```
-
 ### On Kubernetes
 
 ```bash
 # install RBAC
-wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
-    sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl create -n ${NAMESPACE} -f -
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.dhall | \
+    dhall-to-yaml | kubectl create -n ${NAMESPACE} -f -
 
 # install operator
-kubectl create \
-    -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml \
-    -n ${NAMESPACE}
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.dhall | \
+    dhall-to-yaml | kubectl create -n ${NAMESPACE} -f -
 ```
+
+Alternatively, just clone this repository and run `make install` in root folder of the repository.
+Run `make uninstall` to uninstall Kerberos Operator. For OpenShift deployment use `make install-os` and `make uninstall-os`
 
 ### On OpenShift
 
 ```bash
 # install RBAC
-wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
-    sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" |  oc create -n ${NAMESPACE} -f -
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.dhall | \
+    dhall-to-yaml | oc create -n ${NAMESPACE} -f -
 
 # install operator
-oc create \
-    -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.yaml \
-    -n ${NAMESPACE}
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/openshift-deployment.dhall | \
+    dhall-to-yaml | oc create -n ${NAMESPACE} -f -    
 ```
 
 ### Deploy Specific Operator Version
