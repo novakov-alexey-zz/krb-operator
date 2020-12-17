@@ -1,8 +1,8 @@
-let schemas =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/schemas.dhall
+let k8s = ./manifest/k8s.dhall
 
-let union =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/typesUnion.dhall sha256:d7b8c9c574f3c894fa2bca9d9c2bec1fea972bb3acdde90e473bc2d6ee51b5b1
+let schemas = k8s.schemas
+
+let union = k8s.union
 
 let operatorName = "krb-operator"
 
@@ -83,7 +83,7 @@ let deployment =
             , volumes = Some
               [ schemas.Volume::{
                 , configMap = Some schemas.ConfigMapVolumeSource::{
-                  , defaultMode = Some 511 -- 0777 in decimal
+                  , defaultMode = Some 511
                   , name = Some "krb-logback"
                   }
                 , name = "logback-xml"

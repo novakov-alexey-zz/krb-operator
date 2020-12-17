@@ -1,8 +1,8 @@
-let schemas =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/schemas.dhall sha256:7af88fa1a08f6bfafac2a96caa417b924b84eddab589ea715a9d5f333803d771
+let k8s = ./manifest/k8s.dhall
 
-let union =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/typesUnion.dhall sha256:d7b8c9c574f3c894fa2bca9d9c2bec1fea972bb3acdde90e473bc2d6ee51b5b1
+let schemas = k8s.schemas
+
+let union = k8s.union
 
 let namespace = env:NAMESPACE as Text ? "test"
 

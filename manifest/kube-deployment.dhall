@@ -1,8 +1,8 @@
-let schemas =      
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/1.18/schemas.dhall
+let k8s = ./manifest/k8s.dhall
 
-let union =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/1.18/typesUnion.dhall
+let schemas = k8s.schemas
+
+let union = k8s.union
 
 let deploymentName = "krb-operator"
 
@@ -69,7 +69,7 @@ let deployment =
             , volumes = Some
               [ schemas.Volume::{
                 , configMap = Some schemas.ConfigMapVolumeSource::{
-                  , defaultMode = Some 511 -- 0777 in decimal https://www.calculators.tech/octal-to-decimal
+                  , defaultMode = Some 511
                   , name = Some "krb-logback"
                   }
                 , name = "logback-xml"
