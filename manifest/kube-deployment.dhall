@@ -1,8 +1,8 @@
-let schemas =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/a4126b7f8f0c0935e4d86f0f596176c41efbe6fe/schemas.dhall
+let schemas =      
+      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/1.18/schemas.dhall
 
 let union =
-      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/typesUnion.dhall sha256:d7b8c9c574f3c894fa2bca9d9c2bec1fea972bb3acdde90e473bc2d6ee51b5b1
+      https://raw.githubusercontent.com/dhall-lang/dhall-kubernetes/master/1.18/typesUnion.dhall
 
 let deploymentName = "krb-operator"
 
@@ -69,7 +69,7 @@ let deployment =
             , volumes = Some
               [ schemas.Volume::{
                 , configMap = Some schemas.ConfigMapVolumeSource::{
-                  , defaultMode = Some 777
+                  , defaultMode = Some 511 -- 0777 in decimal https://www.calculators.tech/octal-to-decimal
                   , name = Some "krb-logback"
                   }
                 , name = "logback-xml"
@@ -148,8 +148,8 @@ let logbackGraalVmCm =
 in  { apiVersion = "v1"
     , kind = "List"
     , items =
-      [ union.Deployment deployment
-      , union.ConfigMap logbackCm
+      [ union.ConfigMap logbackCm
       , union.ConfigMap logbackGraalVmCm
+      , union.Deployment deployment
       ]
     }

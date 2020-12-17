@@ -83,7 +83,7 @@ let deployment =
             , volumes = Some
               [ schemas.Volume::{
                 , configMap = Some schemas.ConfigMapVolumeSource::{
-                  , defaultMode = Some 777
+                  , defaultMode = Some 511 -- 0777 in decimal
                   , name = Some "krb-logback"
                   }
                 , name = "logback-xml"
