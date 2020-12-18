@@ -24,8 +24,8 @@ with required list of principals, and their predefined or random passwords
 
 ### Prerequisites
 
-- kubectl CLI
-- [dhall CLI](https://docs.dhall-lang.org/tutorials/Getting-started_Generate-JSON-or-YAML.html#installation)
+-   kubectl CLI
+-   [dhall CLI](https://docs.dhall-lang.org/tutorials/Getting-started_Generate-JSON-or-YAML.html#installation)
 
 ### Installation Steps
 
