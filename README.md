@@ -63,20 +63,13 @@ wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master
 
 ### Deploy Specific Operator Version
 
-In order to deploy specific version, clone above manifest files and change the image tag in the `krb-operator` container. 
+In order to deploy a specific version, clone above manifest files and change the image tag in the `krb-operator` container. 
 For example:
 
 ```diff
 -image: alexeyn/kerberos-operator:0.4.10
 +image: alexeyn/kerberos-operator:0.4.11
 ```
-
-### GraalVM Native Image 
-
-There is also a parallel build of Kerberos Operator based GraalVM Native Image. Use Docker Image tag: "&lt;version&gt;-graal-native".
-For example: `kerberos-operator:0.4.11-graal-native`.
-
-Use this tag in Kubernetes or OpenShift manifests (see above).
 
 ## How to uninstall
 

@@ -49,7 +49,5 @@ object Dependencies extends AutoPlugin {
     val circeExtra               = "io.circe"                  %% "circe-generic-extras"       % circeExtrasVersion
     val jacksonJsonSchema        = "com.kjetland"               %% "mbknor-jackson-jsonschema" % jacksonJsonSchemaV
     val jacksonScala             = "com.fasterxml.jackson.module" %% "jackson-module-scala"    % jacksonScalaVersion
-
-    val nativeImageDeps = Seq(janino, bcpkix, commonCompress)
   }
 }
