@@ -1,8 +1,5 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.io.ByteArrayInputStream
-import java.nio.file.{Path, Paths}
-
 import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
@@ -17,6 +14,8 @@ import io.github.novakovalexey.krboperator.KrbOperatorCfg
 import io.github.novakovalexey.krboperator.Utils._
 import io.github.novakovalexey.krboperator.service.Template._
 
+import java.io.ByteArrayInputStream
+import java.nio.file.{Path, Paths}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.{Random, Using}
@@ -68,7 +67,10 @@ object DeploymentResource {
 
   implicit val openShiftDeployment: DeploymentResource[DeploymentConfig] = new DeploymentResource[DeploymentConfig] {
     override def delete(client: OpenShiftClient, d: DeploymentConfig): Boolean =
-      client.deploymentConfigs().inNamespace(d.getMetadata.getNamespace).delete(d)
+      client
+        .deploymentConfigs()
+        .inNamespace(d.getMetadata.getNamespace)
+        .delete(d)
 
     override def findDeployment(client: OpenShiftClient, meta: Metadata): Option[DeploymentConfig] =
       Option(client.deploymentConfigs().inNamespace(meta.namespace).withName(meta.name).get())

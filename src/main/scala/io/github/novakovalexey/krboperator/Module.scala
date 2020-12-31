@@ -39,7 +39,8 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
     additionalPrinterColumns = List(
       AdditionalPrinterColumn(name = "Realm", columnType = "string", jsonPath = ".spec.realm"),
       AdditionalPrinterColumn(name = "Age", columnType = "date", jsonPath = ".metadata.creationTimestamp")
-    )
+    ),
+    version = operatorCfg.crdVersion
   )
   val principalsCfg = serverCfg.copy(additionalPrinterColumns =
     List(AdditionalPrinterColumn(name = "Age", columnType = "date", jsonPath = ".metadata.creationTimestamp"))

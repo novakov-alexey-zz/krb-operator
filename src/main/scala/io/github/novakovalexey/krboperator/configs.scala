@@ -22,6 +22,7 @@ final case class KrbOperatorCfg(
   adminPwd: AdminPassword,
   reconcilerInterval: FiniteDuration,
   operatorPrefix: String,
+  crdVersion: String,
   parallelSecretCreation: Boolean
 )
 final case class KeytabCommand(randomKey: String, noRandomKey: String)
