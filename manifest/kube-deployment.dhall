@@ -1,4 +1,7 @@
-let k8s = ./manifest/k8s.dhall
+-- use local imports for development or local operator repo
+-- let k8s = ./manifest/k8s.dhall
+-- use remote import when dhall files from GitHub
+let k8s = https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/k8s.dhall
 
 let schemas = k8s.schemas
 
