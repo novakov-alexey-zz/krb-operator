@@ -75,10 +75,10 @@ For example:
 
 ```bash
 wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.dhall | \
- 		NAMESPACE=$(CONTROLLER_NAMESPACE) dhall-to-yaml | kubectl delete -n $(CONTROLLER_NAMESPACE) -f -
+ 		NAMESPACE=${NAMESPACE} dhall-to-yaml | kubectl delete -n ${NAMESPACE} -f -
 	
 wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.dhall | \
-		NAMESPACE=$(CONTROLLER_NAMESPACE) dhall-to-yaml | kubectl delete -n $(CONTROLLER_NAMESPACE) -f -
+		NAMESPACE=${NAMESPACE} dhall-to-yaml | kubectl delete -n ${NAMESPACE} -f -
 
 kubectl delete crd krbservers.krb-operator.novakov-alexey.github.io
 kubectl delete crd principalss.krb-operator.novakov-alexey.github.io
