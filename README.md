@@ -74,11 +74,14 @@ For example:
 ## How to uninstall
 
 ```bash
-wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.yaml | \
-    sed  -e "s:{{NAMESPACE}}:${NAMESPACE}:g" | kubectl delete -n ${NAMESPACE} -f -
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/rbac.dhall | \
+ 		NAMESPACE=$(CONTROLLER_NAMESPACE) dhall-to-yaml | kubectl delete -n $(CONTROLLER_NAMESPACE) -f -
 	
-kubectl delete -f https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.yaml -n ${NAMESPACE}
-kubectl delete crd krbs.io.github.novakov-alexey
+wget -O- -q https://raw.githubusercontent.com/novakov-alexey/krb-operator/master/manifest/kube-deployment.dhall | \
+		NAMESPACE=$(CONTROLLER_NAMESPACE) dhall-to-yaml | kubectl delete -n $(CONTROLLER_NAMESPACE) -f -
+
+kubectl delete crd krbservers.krb-operator.novakov-alexey.github.io
+kubectl delete crd principalss.krb-operator.novakov-alexey.github.io
 ```
 
 ## Custom Resource Definitions
