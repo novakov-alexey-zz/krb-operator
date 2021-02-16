@@ -24,7 +24,7 @@ object Dependencies extends AutoPlugin {
       val freyaVersion                     = "0.2.12"
       val scalaTestVersion                 = "3.2.3"
       val scalaTestCheckVersion            = "3.1.0.0-RC2"
-      val scalaCheckVersion                = "1.15.2"
+      val scalaCheckVersion                = "1.15.3"
     }
 
     import DependenciesVersion._
