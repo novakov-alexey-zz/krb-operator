@@ -7,3 +7,4 @@ metals.sbt
 out
 .vscode
 .bsp
+.history

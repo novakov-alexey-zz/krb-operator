@@ -1,4 +1,4 @@
-NAMESPACE=test
+export NAMESPACE=kafka
 
 release:
 	sbt -mem 2048 compile test 'release with-defaults'

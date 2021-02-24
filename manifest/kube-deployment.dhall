@@ -13,13 +13,13 @@ let deployment =
       schemas.Deployment::{
       , metadata = schemas.ObjectMeta::{ name = Some deploymentName }
       , spec = Some schemas.DeploymentSpec::{
-        , replicas = Some 1
+        , replicas = Some +1
         , selector = schemas.LabelSelector::{
           , matchLabels = Some
             [ { mapKey = "deployment", mapValue = deploymentName } ]
           }
         , template = schemas.PodTemplateSpec::{
-          , metadata = schemas.ObjectMeta::{
+          , metadata = Some schemas.ObjectMeta::{
             , labels = Some
               [ { mapKey = "deployment", mapValue = deploymentName } ]
             }
@@ -55,8 +55,8 @@ let deployment =
                   , exec = Some schemas.ExecAction::{
                     , command = Some [ "pgrep", "-fl", "kerberos-operator" ]
                     }
-                  , initialDelaySeconds = Some 20
-                  , periodSeconds = Some 20
+                  , initialDelaySeconds = Some +20
+                  , periodSeconds = Some +20
                   }
                 , name = deploymentName
                 , volumeMounts = Some
@@ -72,7 +72,7 @@ let deployment =
             , volumes = Some
               [ schemas.Volume::{
                 , configMap = Some schemas.ConfigMapVolumeSource::{
-                  , defaultMode = Some 511
+                  , defaultMode = Some +511
                   , name = Some "krb-logback"
                   }
                 , name = "logback-xml"
