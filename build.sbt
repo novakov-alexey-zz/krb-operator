@@ -2,7 +2,7 @@ import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 import sbtrelease.ReleaseStateTransformations._
 
 name := "kerberos-operator"
-scalaVersion := "2.13.4"
+scalaVersion := "2.13.5"
 ThisBuild / organization := "io.github.novakov-alexey"
 ThisBuild / turbo := true
 Global / onChangedBuildSource := ReloadOnSourceChanges
