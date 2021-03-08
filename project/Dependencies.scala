@@ -22,7 +22,7 @@ object Dependencies extends AutoPlugin {
       val jacksonScalaVersion              = "2.12.2"
       val betterMonadicVersion             = "0.3.1"
       val freyaVersion                     = "0.2.12"
-      val scalaTestVersion                 = "3.2.5"
+      val scalaTestVersion                 = "3.2.6"
       val scalaTestCheckVersion            = "3.1.0.0-RC2"
       val scalaCheckVersion                = "1.15.3"
     }
