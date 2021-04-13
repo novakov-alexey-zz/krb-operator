@@ -1,9 +1,6 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.io.ByteArrayOutputStream
-import java.util.concurrent.atomic.AtomicBoolean
-
-import cats.effect.{Sync, Timer}
+import cats.effect.{Async, Temporal}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.models.Metadata
@@ -12,10 +9,12 @@ import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.{ExecListener, ExecWatch, Execable}
 import io.fabric8.kubernetes.client.internal.readiness.Readiness
 import io.fabric8.kubernetes.client.utils.Serialization
+import io.github.novakovalexey.krboperator.Utils._
 import io.github.novakovalexey.krboperator.service.Kadmin.ExecInPodTimeout
 import okhttp3.Response
-import io.github.novakovalexey.krboperator.Utils._
 
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.jdk.CollectionConverters._
 import scala.util.Using
@@ -36,10 +35,10 @@ trait PodsAlg[F[_]] {
 }
 
 object PodsAlg {
-  implicit def k8sPod[F[_]: Sync: Timer]: PodsAlg[F] = new Pods[F]
+  implicit def k8sPod[F[_]: Async: Temporal]: PodsAlg[F] = new Pods[F]
 }
 
-class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with PodsAlg[F] with WaitUtils {
+class Pods[F[_]](implicit F: Async[F], T: Temporal[F]) extends LazyLogging with PodsAlg[F] with WaitUtils {
   private val debug = logDebugWithNamespace(logger)
   private val info = logInfoWithNamespace(logger)
   private val error = logErrorWithNamespace(logger)
@@ -119,11 +118,10 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
   }
 
   private def closeExecWatchers(namespace: String, execs: ExecWatch*): F[Unit] = F.delay {
-    val closedCount = execs.foldLeft(0) {
-      case (acc, ew) =>
-        Using.resource(ew) { _ =>
-          acc + 1
-        }
+    val closedCount = execs.foldLeft(0) { case (acc, ew) =>
+      Using.resource(ew) { _ =>
+        acc + 1
+      }
     }
     debug(namespace, s"Closed execWatcher(s): $closedCount")
   }
@@ -145,7 +143,9 @@ class Pods[F[_]](implicit F: Sync[F], T: Timer[F]) extends LazyLogging with Pods
     duration: FiniteDuration = 1.minute
   ): F[Option[Pod]] = {
     for {
-      _ <- F.delay(debug(meta.namespace, s"Going to wait for Pod in namespace ${meta.namespace} until ready: $duration"))
+      _ <- F.delay(
+        debug(meta.namespace, s"Going to wait for Pod in namespace ${meta.namespace} until ready: $duration")
+      )
       (ready, pod) <- waitFor[F, Pod](meta.namespace, duration, previewPod) {
         for {
           p <- findPod

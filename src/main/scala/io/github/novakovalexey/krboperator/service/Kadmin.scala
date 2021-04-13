@@ -1,8 +1,6 @@
 package io.github.novakovalexey.krboperator.service
 
-import java.nio.file.{Path, Paths}
-
-import cats.effect.{Sync, Timer}
+import cats.effect.{Async, Temporal}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.models.Metadata
@@ -12,6 +10,7 @@ import io.fabric8.kubernetes.client.dsl.{ExecWatch, Execable}
 import io.github.novakovalexey.krboperator.Utils._
 import io.github.novakovalexey.krboperator._
 
+import java.nio.file.{Path, Paths}
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -40,9 +39,9 @@ class KeytabPathGenerator extends KeytabPathAlg {
     s"/tmp/$prefix/$name"
 }
 
-class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
-  implicit F: Sync[F],
-  T: Timer[F],
+class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit
+  F: Async[F],
+  T: Temporal[F],
   pods: PodsAlg[F],
   pathGen: KeytabPathAlg
 ) extends LazyLogging
@@ -61,28 +60,27 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
 
       principals <- F.defer {
         val groupedByKeytab = principals.groupBy(_.keytab)
-        val keytabsOrErrors = groupedByKeytab.toList.map {
-          case (keytab, principals) =>
-            val path = Paths.get(pathGen.keytabToPath(randomString, keytab))
-            for {
-              _ <- createWorkingDir(context.meta.namespace, podName, path.getParent)
-              credentials = principals.map(p => Credentials(p.name, getPassword(p.password), p.secret))
-              _ <- addKeytab(context, path, credentials, podName)
-            } yield PrincipalsWithKey(credentials, KeytabMeta(keytab, path))
+        val keytabsOrErrors = groupedByKeytab.toList.map { case (keytab, principals) =>
+          val path = Paths.get(pathGen.keytabToPath(randomString, keytab))
+          for {
+            _ <- createWorkingDir(context.meta.namespace, podName, path.getParent)
+            credentials = principals.map(p => Credentials(p.name, getPassword(p.password), p.secret))
+            _ <- addKeytab(context, path, credentials, podName)
+          } yield PrincipalsWithKey(credentials, KeytabMeta(keytab, path))
         }
         keytabsOrErrors.sequence
       }
     } yield {
       debug(context.meta.namespace, s"principals created: $principals")
       KerberosState(podName, principals)
-    }).adaptErr {
-      case t => new RuntimeException(s"Failed to create principal(s) & keytab(s) via 'kadmin'", t)
+    }).adaptErr { case t =>
+      new RuntimeException(s"Failed to create principal(s) & keytab(s) via 'kadmin'", t)
     }
 
   private def waitForPod(context: KadminContext, duration: FiniteDuration = 1.minute): F[Option[Pod]] = {
     val previewPod: Option[Pod] => F[Unit] = pod =>
-      pod.fold(F.delay(debug(context.meta.namespace, "Pod is not available yet")))(
-        p => F.delay(debug(context.meta.namespace, s"Pod ${p.getMetadata.getName} is not ready"))
+      pod.fold(F.delay(debug(context.meta.namespace, "Pod is not available yet")))(p =>
+        F.delay(debug(context.meta.namespace, s"Pod ${p.getMetadata.getName} is not ready"))
       )
 
     pods.waitForPod(client)(
@@ -100,12 +98,11 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(
     podName: String
   ): F[Unit] =
     executeInKadmin(context.meta.namespace, podName) { exe =>
-      credentials.foldLeft(List.empty[ExecWatch]) {
-        case (watchers, c) =>
-          watchers ++ List(
-                createPrincipal(context.realm, context.adminPwd, exe, c),
-                createKeytab(context.realm, context.adminPwd, exe, c, keytabPath)
-              )
+      credentials.foldLeft(List.empty[ExecWatch]) { case (watchers, c) =>
+        watchers ++ List(
+          createPrincipal(context.realm, context.adminPwd, exe, c),
+          createKeytab(context.realm, context.adminPwd, exe, c, keytabPath)
+        )
       }
     }
 

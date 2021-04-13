@@ -1,7 +1,7 @@
 package io.github.novakovalexey.krboperator
 
 import cats.Parallel
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import freya.Configuration.CrdConfig
 import freya.K8sNamespace.{AllNamespaces, CurrentNamespace, Namespace}
 import freya._
@@ -15,7 +15,7 @@ import io.fabric8.openshift.client.{DefaultOpenShiftClient, OpenShiftClient, Ope
 import io.github.novakovalexey.krboperator.service.{KeytabPathAlg, _}
 
 object Module {
-  val k8sClientTimeout = 30 * 1000
+  val k8sClientTimeout: Int = 30 * 1000
   def defaultClient: KubernetesClient =
     new DefaultOpenShiftClient(
       new OpenShiftConfigBuilder()
@@ -29,9 +29,8 @@ object Module {
     )
 }
 
-class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[KubernetesClient])(implicit
-  pathGen: KeytabPathAlg
-) extends Codecs {
+class Module[F[_]: Async: Parallel: PodsAlg](client: F[KubernetesClient])(implicit pathGen: KeytabPathAlg)
+    extends Codecs {
   val operatorCfg: KrbOperatorCfg = AppConfig.load.fold(e => sys.error(s"failed to load config: $e"), identity)
   val serverCfg: CrdConfig = CrdConfig(
     NamespaceHelper.getNamespace,
@@ -54,7 +53,8 @@ class Module[F[_]: ConcurrentEffect: Parallel: Timer: PodsAlg](client: F[Kuberne
   ): Template[F, Deployment] =
     new Template[F, Deployment](client, secrets, operatorCfg)
 
-  var serverHelper: CrdHelper[F, KrbServer, KrbServerStatus] = null // temporary hack
+  var serverHelper: CrdHelper[F, KrbServer, KrbServerStatus] =
+    null // temporary hack to catch serverHelper reference :-(
 
   def serverController(h: CrdHelper[F, KrbServer, KrbServerStatus]): KubernetesClient => ServerController[F] =
     (client: KubernetesClient) => {

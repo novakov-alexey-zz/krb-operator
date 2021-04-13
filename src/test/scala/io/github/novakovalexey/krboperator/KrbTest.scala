@@ -1,8 +1,7 @@
 package io.github.novakovalexey.krboperator
 
-import java.util.Base64
-
 import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import freya.models.Metadata
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.apps.{Deployment, DeploymentBuilder}
@@ -20,28 +19,23 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.Base64
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
 
-class KrbTest
-    extends AnyPropSpec
-    with BeforeAndAfter
-    with Matchers
-    with ContextShiftTest
-    with ScalaCheckPropertyChecks {
+class KrbTest extends AnyPropSpec with BeforeAndAfter with Matchers with ScalaCheckPropertyChecks {
 
   val testPod = "test-pod"
   val tempDir = "tempDir"
 
   object expectations {
     def setup(
-               server: OpenShiftServer,
-               meta: Metadata,
-               podName: String,
-               cfg: KrbOperatorCfg,
-               principals: Principals,
-               tempDir: String
+      server: OpenShiftServer,
+      meta: Metadata,
+      podName: String,
+      cfg: KrbOperatorCfg,
+      principals: Principals,
+      tempDir: String
     ): Unit = {
       server
         .expect()

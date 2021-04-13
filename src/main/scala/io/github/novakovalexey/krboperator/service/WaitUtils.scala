@@ -1,10 +1,10 @@
 package io.github.novakovalexey.krboperator.service
 
-import cats.effect.{Sync, Timer}
-import cats.implicits._
+import cats.effect.{Async, Temporal}
+import cats.syntax.all._
 import com.typesafe.scalalogging.LazyLogging
-import io.github.novakovalexey.krboperator.service.WaitUtils._
 import io.github.novakovalexey.krboperator.Utils._
+import io.github.novakovalexey.krboperator.service.WaitUtils._
 
 import scala.concurrent.duration._
 
@@ -14,14 +14,21 @@ object WaitUtils {
 
 trait WaitUtils extends LazyLogging {
 
-  def waitFor[F[_]](namespace: String, waitTime: FiniteDuration)(action: F[Boolean])(implicit F: Sync[F], T: Timer[F]): F[Boolean] =
-    waitFor[F, Nothing](namespace, waitTime, _ => F.unit, defaultDelay)(action.map(_ -> None)).map {
-      case (status, _) => status
+  def waitFor[F[_]](namespace: String, waitTime: FiniteDuration)(
+    action: F[Boolean]
+  )(implicit F: Async[F], T: Temporal[F]): F[Boolean] = {
+    val result = waitFor[F, Nothing](namespace, waitTime, _ => F.unit, defaultDelay)(action.map(a => (a, None)))
+    result.map { case (status, _) =>
+      status
     }
+  }
 
-  def waitFor[F[_], S](namespace: String, waitTime: FiniteDuration, peek: Option[S] => F[Unit], delay: FiniteDuration = defaultDelay)(
-    action: F[(Boolean, Option[S])]
-  )(implicit F: Sync[F], T: Timer[F]): F[(Boolean, Option[S])] = {
+  def waitFor[F[_], S](
+    namespace: String,
+    waitTime: FiniteDuration,
+    peek: Option[S] => F[Unit],
+    delay: FiniteDuration = defaultDelay
+  )(action: F[(Boolean, Option[S])])(implicit F: Async[F], T: Temporal[F]): F[(Boolean, Option[S])] = {
     val debug = logDebugWithNamespace(logger)
 
     def loop(spent: FiniteDuration, waitTime: FiniteDuration): F[(Boolean, Option[S])] =

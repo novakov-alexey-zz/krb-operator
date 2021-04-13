@@ -1,6 +1,6 @@
 package io.github.novakovalexey.krboperator.service
 
-import cats.effect.{Sync, Timer}
+import cats.effect.{Async, Sync, Temporal}
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import freya.models.Metadata
@@ -92,8 +92,8 @@ object DeploymentResource {
 }
 
 class Template[F[_], T <: HasMetadata](client: OpenShiftClient, secret: Secrets[F], cfg: KrbOperatorCfg)(implicit
-  F: Sync[F],
-  T: Timer[F],
+  F: Async[F],
+  T: Temporal[F],
   resource: DeploymentResource[T]
 ) extends LazyLogging
     with WaitUtils {
