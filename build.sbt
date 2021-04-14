@@ -30,11 +30,11 @@ lazy val root = (project in file("."))
       jacksonScala % Test
     ),
     dockerBaseImage := "openjdk:8-jre-alpine",
-    dockerRepository in Docker := Some("alexeyn"),
-    javaOptions in Universal ++= Seq("-Dlogback.configurationFile=/opt/conf/logback.xml"),
+    Docker / dockerRepository := Some("alexeyn"),
+    Universal / javaOptions ++= Seq("-Dlogback.configurationFile=/opt/conf/logback.xml"),
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
     buildInfoOptions += BuildInfoOption.BuildTime,
-    assemblyMergeStrategy in assembly := {
+    assembly / assemblyMergeStrategy := {
       case PathList("javax", "servlet", _*) => MergeStrategy.last
       case PathList("javax", "activation", _*) => MergeStrategy.last
       case PathList("javax", "xml", _*) => MergeStrategy.last
@@ -57,17 +57,17 @@ lazy val root = (project in file("."))
       case "resources.arsc" => MergeStrategy.discard
       case "META-INF/jandex.idx" => MergeStrategy.discard
       case x =>
-        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     },
-    test in assembly := {}
+    assembly / test := {}
   )
   .enablePlugins(BuildInfoPlugin, AshScriptPlugin)
 
-mappings in Universal ++= directory("src/main/resources")
+Universal / mappings ++= directory("src/main/resources")
 
 Revolver.enableDebugging(port = 5050, suspend = true)
-envVars in reStart := Map("NAMESPACE" -> "test")
+reStart / envVars := Map("NAMESPACE" -> "test")
 
 releaseProcess :=
   Seq[ReleaseStep](
