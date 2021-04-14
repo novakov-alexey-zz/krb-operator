@@ -68,7 +68,7 @@ class PrincipalsController[F[_]: Parallel](
     servers <- F.fromEither(serverHelper.currentResources())
     server = servers.find { r =>
       r match {
-        case Left((_, meta)) => meta.getMetadata.getName == serverName
+        case Left(_) => false
         case Right(cr) => cr.metadata.name == serverName
       }
     }.map(_.leftMap(_._1))
