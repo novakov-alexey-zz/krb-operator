@@ -49,7 +49,7 @@ let deployment =
                     , value = Some "false"
                     }
                   ]
-                , image = Some "alexeyn/kerberos-operator:0.4.16"
+                , image = Some "alexeyn/kerberos-operator:0.4.17"
                 , imagePullPolicy = Some "Always"
                 , livenessProbe = Some schemas.Probe::{
                   , exec = Some schemas.ExecAction::{
