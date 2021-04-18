@@ -14,7 +14,7 @@ object Dependencies extends AutoPlugin {
       val logbackClassicVersion            = "1.3.0-alpha4"
       val janinoVersion                    = "3.1.2"
 
-      val pureConfigVersion                = "0.14.1"
+      val pureConfigVersion                = "0.15.0"
       val scalaLoggingVersion              = "3.9.3"
       val fabric8K8sVersion                = "5.3.0"
       val codecsVersion                    = "1.15"
