@@ -248,4 +248,4 @@ kubectl delete -f examples/my-krb-1.yaml
 sbt docker:publishLocal
 ```
 
-Then use your built image in `manifest/*-deployment.yaml` file for `krb-operator` container.
+Then use your built image in `manifest/*-deployment.dhall` file for `krb-operator` container.
