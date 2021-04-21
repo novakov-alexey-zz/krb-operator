@@ -118,41 +118,10 @@ let logbackCm =
       , metadata = schemas.ObjectMeta::{ name = Some "krb-logback" }
       }
 
-let logbackGraalVmCm =
-      schemas.ConfigMap::{
-      , data = Some
-        [ { mapKey = "logback.xml"
-          , mapValue =
-              ''
-              <configuration>
-                <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-                    <!-- On Windows machines setting withJansi to true enables ANSI
-                        color code interpretation by the Jansi library. This requires
-                        org.fusesource.jansi:jansi:1.8 on the class path.  Note that
-                        Unix-based operating systems such as Linux and Mac OS X
-                        support ANSI color codes by default. -->
-                    <withJansi>true</withJansi>
-                    <encoder>
-                        <pattern>%highlight(%date{yyyy-MM-dd HH:mm:ss.SSSZ, UTC}) [%thread] %highlight(%-5level) %cyan(%logger{15}) - %msg %n</pattern>
-                    </encoder>
-                </appender>
-                <root level="INFO">
-                    <appender-ref ref="STDOUT" />
-                </root>
-              </configuration>
-              ''
-          }
-        ]
-      , metadata = schemas.ObjectMeta::{
-        , name = Some "krb-logback-graal-native"
-        }
-      }
-
 in  { apiVersion = "v1"
     , kind = "List"
     , items =
-      [ union.ConfigMap logbackCm
-      , union.ConfigMap logbackGraalVmCm
+      [ union.ConfigMap logbackCm      
       , union.Deployment deployment
       ]
     }
