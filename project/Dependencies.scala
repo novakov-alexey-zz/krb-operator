@@ -8,8 +8,8 @@ object Dependencies extends AutoPlugin {
 
     object DependenciesVersion {
       val catsVersion                      = "2.1.1"
-      val circeVersion                     = "0.13.0"
-      val circeExtrasVersion               = "0.13.0"
+      val circeVersion                     = "0.14.0"
+      val circeExtrasVersion               = "0.14.0"
 
       val logbackClassicVersion            = "1.3.0-alpha4"
       val janinoVersion                    = "3.1.2"
