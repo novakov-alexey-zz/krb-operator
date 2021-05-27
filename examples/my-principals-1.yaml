@@ -1,7 +1,7 @@
 apiVersion: krb-operator.novakov-alexey.github.io/v1
 kind: Principals
 metadata:
-  name: my-krb1
+  name: my-krb
   labels:
     krb-operator.novakov-alexey.github.io/server: my-krb1
 spec:

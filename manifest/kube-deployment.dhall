@@ -9,6 +9,8 @@ let union = k8s.union
 
 let deploymentName = "krb-operator"
 
+let version = env:OPERATOR_VERSION as Text ? "0.4.17" 
+
 let deployment =
       schemas.Deployment::{
       , metadata = schemas.ObjectMeta::{ name = Some deploymentName }
@@ -49,7 +51,7 @@ let deployment =
                     , value = Some "false"
                     }
                   ]
-                , image = Some "alexeyn/kerberos-operator:0.4.17"
+                , image = Some "alexeyn/kerberos-operator:${version}"
                 , imagePullPolicy = Some "Always"
                 , livenessProbe = Some schemas.Probe::{
                   , exec = Some schemas.ExecAction::{

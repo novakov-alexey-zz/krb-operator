@@ -79,7 +79,7 @@ class Pods[F[_]](implicit F: Async[F], T: Temporal[F]) extends LazyLogging with 
         val watchers = commands(execablePod)
 
         for {
-          _ <- F.delay(info(namespace, s"Waiting for Pod exec listener to be closed for $ExecInPodTimeout"))
+          _ <- F.delay(info(namespace, s"Waiting $ExecInPodTimeout for Pod exec listener to be closed"))
           closed <- waitFor[F](namespace, ExecInPodTimeout)(F.delay(isClosed.get()))
           _ <- F
             .raiseError[Unit](new RuntimeException(s"Failed to close POD exec listener within $ExecInPodTimeout"))

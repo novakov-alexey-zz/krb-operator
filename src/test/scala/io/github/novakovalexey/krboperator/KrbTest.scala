@@ -22,6 +22,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import java.util.Base64
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
+import freya.models
 
 class KrbTest extends AnyPropSpec with BeforeAndAfter with Matchers with ScalaCheckPropertyChecks {
 
@@ -259,13 +260,19 @@ class KrbTest extends AnyPropSpec with BeforeAndAfter with Matchers with ScalaCh
     implicit val resource: DeploymentResource[Deployment] = mockDeployment
     val secrets = new Secrets[IO](client, mod.operatorCfg)
     implicit val pathGen: KeytabPathAlg = (_: String, name: String) => s"/tmp/$tempDir/$name"
+
     val kadmin = new Kadmin[IO](client, mod.operatorCfg)
     val openShiftClient = client.asInstanceOf[OpenShiftClient]
+
     val serverController =
       mod.serverControllerFor(mod.k8sTemplate(openShiftClient, secrets), secrets)
+
     val principalsController =
       new PrincipalsController(null, openShiftClient, secrets, kadmin, mod.operatorCfg, false) {
-        override private[krboperator] def getRealm(meta: Metadata) = IO("test")
+        override private[krboperator] def getKrbServer(
+          meta: Metadata
+        ): IO[models.CustomResource[KrbServer, KrbServerStatus]] =
+          IO(models.CustomResource(Metadata("test-server", "test", Map.empty, "123", "uuid"), KrbServer("test"), None))
       }
     (serverController, principalsController)
   }

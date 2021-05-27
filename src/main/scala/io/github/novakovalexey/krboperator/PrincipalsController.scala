@@ -34,14 +34,11 @@ class PrincipalsController[F[_]: Parallel](
   override def onAdd(resource: CustomResource[Principals, PrincipalsStatus]): F[NewStatus[PrincipalsStatus]] =
     onApply(resource.spec, resource.metadata)
 
-  override def onModify(
-    resource: CustomResource[Principals, PrincipalsStatus]
-  ): F[NewStatus[PrincipalsStatus]] =
+  override def onModify(resource: CustomResource[Principals, PrincipalsStatus]): F[NewStatus[PrincipalsStatus]] =
     onApply(resource.spec, resource.metadata)
 
-  override def reconcile(
-    resource: CustomResource[Principals, PrincipalsStatus]
-  ): F[NewStatus[PrincipalsStatus]] = onApply(resource.spec, resource.metadata)
+  override def reconcile(resource: CustomResource[Principals, PrincipalsStatus]): F[NewStatus[PrincipalsStatus]] =
+    onApply(resource.spec, resource.metadata)
 
   override def onDelete(resource: CustomResource[Principals, PrincipalsStatus]): F[Unit] =
     F.delay(info(resource.metadata.namespace, s"delete event: ${resource.spec}, ${resource.metadata}")) *> secret
@@ -49,7 +46,7 @@ class PrincipalsController[F[_]: Parallel](
 
   private def onApply(principals: Principals, meta: Metadata) =
     for {
-      realm <- getRealm(meta)
+      server <- getKrbServer(meta)
       missingSecrets <- secret.findMissing(meta, principals.list.map(_.secret.name).toSet)
       created <- missingSecrets.toList match {
         case Nil =>
@@ -57,29 +54,38 @@ class PrincipalsController[F[_]: Parallel](
         case _ =>
           F.delay(
             info(meta.namespace, s" There are ${missingSecrets.size} missing secrets, name(s): $missingSecrets")
-          ) *> createSecrets(realm, principals, meta, missingSecrets)
+          ) *> createSecrets(server, principals, meta, missingSecrets)
       }
       _ <- F.whenA(created.nonEmpty)(F.delay(info(meta.namespace, s"${created.length} secrets created")))
     } yield PrincipalsStatus(processed = true, created.length, principals.list.length).some
 
-  private[krboperator] def getRealm(meta: Metadata): F[String] = for {
+  private[krboperator] def getKrbServer(meta: Metadata): F[CustomResource[KrbServer, KrbServerStatus]] = for {
     serverName <- F.fromEither(meta.labels.collectFirst { case (ServerLabel, v) => v }
       .toRight(new RuntimeException(s"Current resource does not have a label '$ServerLabel'")))
     servers <- F.fromEither(serverHelper.currentResources())
-    server = servers.find { r =>
+    serverOrError = servers.find { r =>
       r match {
         case Left(_) => false
         case Right(cr) => cr.metadata.name == serverName
       }
     }.map(_.leftMap(_._1))
-      .getOrElse(Either.left(new RuntimeException(s"Failed to find server resource with name $serverName")))
-    server <- F.fromEither(server)
-  } yield server.spec.realm
+      .getOrElse(
+        Either.left(
+          new RuntimeException(s"Failed to find ${classOf[KrbServer].getSimpleName()} resource with name '$serverName'")
+        )
+      )
+    server <- F.fromEither(serverOrError)
+  } yield server
 
-  private def createSecrets(realm: String, principals: Principals, meta: Metadata, missingSecrets: Set[String]) =
+  private def createSecrets(
+    server: CustomResource[KrbServer, KrbServerStatus],
+    principals: Principals,
+    meta: Metadata,
+    missingSecrets: Set[String]
+  ) =
     for {
       pwd <- secret.getAdminPwd(meta)
-      context = KadminContext(realm, meta, pwd)
+      context = KadminContext(server.metadata.name, server.spec.realm, meta, pwd)
       created <- {
         val tasks = missingSecrets
           .map(s => (s, principals.list.filter(_.secret.name == s)))

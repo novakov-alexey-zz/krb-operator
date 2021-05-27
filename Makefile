@@ -1,4 +1,5 @@
 export NAMESPACE=kafka
+export OPERATOR_VERSION=0.4.17
 
 release:
 	sbt -mem 2048 compile test 'release with-defaults'

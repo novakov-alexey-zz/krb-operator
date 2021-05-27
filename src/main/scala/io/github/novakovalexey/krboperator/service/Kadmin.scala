@@ -20,7 +20,7 @@ final case class Credentials(username: String, password: String, secret: Secret)
 final case class PrincipalsWithKey(credentials: List[Credentials], keytabMeta: KeytabMeta)
 final case class KeytabMeta(name: String, path: Path)
 final case class KerberosState(podName: String, principals: List[PrincipalsWithKey])
-final case class KadminContext(realm: String, meta: Metadata, adminPwd: String)
+final case class KadminContext(krbServerName: String, realm: String, meta: Metadata, adminPwd: String)
 
 object Kadmin {
   val ExecInPodTimeout: FiniteDuration = 60.seconds
@@ -52,10 +52,7 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit
 
   def createPrincipalsAndKeytabs(principals: List[Principal], context: KadminContext): F[KerberosState] =
     (for {
-      pod <- waitForPod(context).flatMap(
-        F.fromOption(_, new RuntimeException(s"[${context.meta.namespace}] No Krb POD found for ${context.meta}"))
-      )
-
+      pod <- waitForPod(context)
       podName = pod.getMetadata.getName
 
       principals <- F.defer {
@@ -74,21 +71,32 @@ class Kadmin[F[_]](client: KubernetesClient, cfg: KrbOperatorCfg)(implicit
       debug(context.meta.namespace, s"principals created: $principals")
       KerberosState(podName, principals)
     }).adaptErr { case t =>
-      new RuntimeException(s"Failed to create principal(s) & keytab(s) via 'kadmin'", t)
+      new RuntimeException(s"Failed to create principal and keytab via 'kadmin' CLI", t)
     }
 
-  private def waitForPod(context: KadminContext, duration: FiniteDuration = 1.minute): F[Option[Pod]] = {
+  private def waitForPod(context: KadminContext, duration: FiniteDuration = 1.minute): F[Pod] = {
+    val labelKey = Template.DeploymentSelector
+    val labelValue = context.krbServerName
     val previewPod: Option[Pod] => F[Unit] = pod =>
-      pod.fold(F.delay(debug(context.meta.namespace, "Pod is not available yet")))(p =>
-        F.delay(debug(context.meta.namespace, s"Pod ${p.getMetadata.getName} is not ready"))
-      )
+      pod.fold(
+        F.delay(debug(context.meta.namespace, s"Pod with label '${labelKey}=${labelValue}'' is not available yet"))
+      )(p => F.delay(debug(context.meta.namespace, s"Pod ${p.getMetadata.getName} is not ready")))
 
-    pods.waitForPod(client)(
-      context.meta,
-      previewPod,
-      F.delay(pods.getPod(client)(context.meta.namespace, Template.DeploymentSelector, context.meta.name)),
-      duration
-    )
+    pods
+      .waitForPod(client)(
+        context.meta,
+        previewPod,
+        F.delay(pods.getPod(client)(context.meta.namespace, labelKey, labelValue)),
+        duration
+      )
+      .flatMap(maybePod =>
+        F.fromOption(
+          maybePod,
+          new RuntimeException(
+            s"[${context.meta.namespace}] No 'Krb' POD found with label: ${Template.DeploymentSelector}=${context.krbServerName}"
+          )
+        )
+      )
   }
 
   private def addKeytab(
